@@ -65,7 +65,16 @@ for required in plugin.json main.py dist/index.js; do
 done
 
 sudo_cmd=""
-if [ ! -w "$plugins_dir" ]; then
+needs_root=false
+if [ -d "$plugins_dir" ]; then
+  [ -w "$plugins_dir" ] || needs_root=true
+elif [ -w "$(dirname "$plugins_dir")" ]; then
+  : # parent dir writable, can create without sudo
+else
+  needs_root=true
+fi
+
+if $needs_root; then
   if [ "$(id -u)" -eq 0 ]; then
     sudo_cmd=""
   elif command -v sudo >/dev/null 2>&1; then
