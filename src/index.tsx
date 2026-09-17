@@ -2,11 +2,12 @@ import {
   PanelSection,
   PanelSectionRow,
   ToggleField,
+  ButtonItem,
   staticClasses
 } from "@decky/ui";
-import { callable, definePlugin } from "@decky/api";
+import { callable, definePlugin, toaster } from "@decky/api";
 import { useEffect, useState } from "react";
-import { FaRobot } from "react-icons/fa";
+import { FaRobot, FaDownload } from "react-icons/fa";
 
 type ModelInfo = {
   name: string;
@@ -27,10 +28,33 @@ type Status = {
   error: string;
 };
 
+type ModelUpdate = {
+  model: string;
+  ok: boolean;
+  detail: string;
+};
+
+type OllamaUpdate = {
+  ok: boolean;
+  before: string | null;
+  after: string | null;
+  error: string;
+};
+
+type UpdateResult = {
+  ok: boolean;
+  service_active: boolean;
+  was_active: boolean;
+  ollama: OllamaUpdate;
+  models: ModelUpdate[];
+  error: string;
+};
+
 const getStatus = callable<[], Status>("get_status");
 const setService = callable<[on: boolean], { ok: boolean }>("set_service");
 const setAutostart = callable<[on: boolean], { ok: boolean }>("set_autostart");
 const setKeepAwake = callable<[on: boolean], { ok: boolean }>("set_keep_awake");
+const updateAll = callable<[], UpdateResult>("update_all");
 
 function formatSize(size: number): string {
   const units = ["B", "KB", "MB", "GB", "TB"];
@@ -81,7 +105,7 @@ function Content() {
   const run = async (op: () => Promise<unknown>) => {
     setBusy(true);
     try {
-      await op();
+      return await op();
     } finally {
       setBusy(false);
       await refresh();
@@ -97,6 +121,44 @@ function Content() {
       </PanelSection>
     );
   }
+
+  const doUpdate = async () => {
+    setBusy(true);
+    let res: UpdateResult | undefined;
+    try {
+      res = await updateAll();
+      const o = res.ollama;
+      const body =
+        o.before && o.after && o.before !== o.after
+          ? `Ollama ${o.before} -> ${o.after}`
+          : `Ollama ${o.after ?? "?"}`;
+      const okModels = res.models.filter((m) => m.ok).length;
+      const failed = res.models.filter((m) => !m.ok);
+      const modelSummary = res.models.length
+        ? `${okModels}/${res.models.length} modelos`
+        : "sem modelos para atualizar";
+      toaster.toast({
+        title: res.ok ? "Update concluído" : "Update com falhas",
+        body:
+          `${body} · ${modelSummary}` +
+          (failed.length
+            ? ` · falhou: ${failed.map((m) => m.model).join(", ")}`
+            : ""),
+        critical: !res.ok,
+        duration: 8000
+      });
+    } catch (err) {
+      console.error("update_all failed", err);
+      toaster.toast({
+        title: "Update falhou",
+        body: String(err),
+        critical: true
+      });
+    } finally {
+      setBusy(false);
+      await refresh();
+    }
+  };
 
   return (
     <PanelSection title="Ollama Deck">
@@ -173,6 +235,31 @@ function Content() {
           </div>
         </PanelSectionRow>
       ) : null}
+
+      <PanelSection title="Updates">
+        <PanelSectionRow>
+          <ButtonItem
+            layout="below"
+            disabled={busy}
+            onClick={doUpdate}
+            description={
+              status.service_active
+                ? "Atualiza o binário e faz pull dos modelos instalados."
+                : "Atualiza o binário; os modelos listados serão puxados."
+            }
+          >
+            <FaDownload style={{ marginRight: "8px", verticalAlign: "middle" }} />
+            Update Ollama &amp; models
+          </ButtonItem>
+        </PanelSectionRow>
+        <PanelSectionRow>
+          <div style={{ color: "#8b8b8b", fontSize: "12px" }}>
+            {busy
+              ? "A atualizar… a inferência fica em pausa."
+              : `Versão atual: ${status.version ?? "—"}. Modelos: ${status.models.length}.`}
+          </div>
+        </PanelSectionRow>
+      </PanelSection>
 
       {status.models.length > 0 ? (
         <PanelSection title="Models">

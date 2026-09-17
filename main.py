@@ -2,6 +2,7 @@ import asyncio
 import json
 import os
 import re
+import shlex
 import subprocess
 import urllib.request
 from typing import Any, Optional
@@ -18,7 +19,14 @@ INHIBIT_REASON = "Serving Ollama requests on Ollama-Deck"
 INHIBIT_WHAT = "sleep:idle"
 API_BASE = "http://127.0.0.1:11434"
 LAN_BIN = "/home/deck/.local/share/ollama-bin/bin/ollama"
+OLLAMA_ROOT = os.path.dirname(os.path.dirname(LAN_BIN))
 UNIT_PATH = os.path.expanduser("~/.config/systemd/user/ollama.service")
+OLLAMA_ARCH = {
+    "x86_64": "amd64",
+    "aarch64": "arm64",
+    "armv7l": "arm64",
+    "arm64": "arm64",
+}.get(os.uname().machine or "")
 
 UNIT_TEMPLATE = """[Unit]
 Description=Ollama Service (Vulkan RADV no Steam Deck)
@@ -60,6 +68,43 @@ def _user_env() -> dict:
     env.setdefault("XDG_RUNTIME_DIR", f"/run/user/{uid}")
     env.setdefault("DBUS_SESSION_BUS_ADDRESS", f"unix:path=/run/user/{uid}/bus")
     return env
+
+
+def ollama_bin_env() -> dict:
+    """Environment to run the ollama CLI/binary from its user-space install."""
+    env = os.environ.copy()
+    lib = os.path.join(OLLAMA_ROOT, "lib", "ollama")
+    existing = env.get("LD_LIBRARY_PATH")
+    env["LD_LIBRARY_PATH"] = lib + (os.pathsep + existing if existing else "")
+    env["PATH"] = (
+        os.path.join(OLLAMA_ROOT, "bin")
+        + os.pathsep
+        + env.get("PATH", "/usr/bin:/bin")
+    )
+    return env
+
+
+async def update_ollama_bin() -> tuple[bool, str]:
+    """Download the official ollama tarball and extract it over the user-space
+    install root (no sudo, matches the existing ~/.local/share/ollama-bin)."""
+    if not OLLAMA_ARCH:
+        return False, "arquitetura não suportada"
+    url = f"https://ollama.com/download/ollama-linux-{OLLAMA_ARCH}.tar.zst"
+    os.makedirs(OLLAMA_ROOT, exist_ok=True)
+    target = shlex.quote(OLLAMA_ROOT)
+    for extractor in (f"tar --zstd -C {target} -xf -", f"unzstd | tar -C {target} -xf -"):
+        proc = await asyncio.create_subprocess_shell(
+            f"curl -fsSL {shlex.quote(url)} | {extractor}",
+            stdout=asyncio.subprocess.PIPE,
+            stderr=asyncio.subprocess.PIPE,
+        )
+        out, err = await proc.communicate()
+        if proc.returncode == 0:
+            return True, ""
+        last_err = err.decode(errors="replace").strip()
+        if extractor.startswith("unzstd"):
+            break
+    return False, last_err or "download/extração falhou"
 
 
 def format_size(size: int) -> str:
@@ -328,4 +373,59 @@ class Plugin:
             "ok": True,
             "keep_awake": bool(on),
             "keep_awake_locked": await Inhibitor.active(),
+        }
+
+    async def _pull(self, tag: str) -> dict:
+        proc = await asyncio.create_subprocess_exec(
+            LAN_BIN,
+            "pull",
+            tag,
+            stdout=asyncio.subprocess.PIPE,
+            stderr=asyncio.subprocess.STDOUT,
+            env=ollama_bin_env(),
+        )
+        out, _ = await proc.communicate()
+        tail = out.decode(errors="replace").strip().splitlines()
+        detail = (tail[-1] if tail else "").strip()
+        return {
+            "model": tag,
+            "ok": proc.returncode == 0 and not any(
+                s in detail.lower() for s in ("error", "failed", "not found")
+            ),
+            "detail": detail[:200],
+        }
+
+    async def update_all(self) -> dict:
+        """Update the ollama binary, then pull the installed/config models."""
+        was_active = await Systemctl.is_active()
+        version_before = OllamaApi.version()
+        tags = [m["name"] for m in OllamaApi.models()]
+        for extra in self.settings.get("model_tags", []) or []:
+            if extra not in tags:
+                tags.append(extra)
+        await Systemctl.run("stop", SERVICE)
+        bin_ok, bin_err = await update_ollama_bin()
+        await Systemctl.run("start", SERVICE)
+        await self._sync()
+        version_after = OllamaApi.version()
+        results = [await self._pull(tag) for tag in tags]
+        failed_models = [r["model"] for r in results if not r["ok"]]
+        ok = bin_ok and not failed_models
+        return {
+            "ok": ok,
+            "service_active": await Systemctl.is_active(),
+            "was_active": was_active,
+            "ollama": {
+                "ok": bin_ok,
+                "before": version_before,
+                "after": version_after,
+                "error": bin_err,
+            },
+            "models": results,
+            "error": (
+                ""
+                if ok
+                else "falhas em: " + ", ".join(failed_models)
+                + ("" if bin_ok else " e update do binário")
+            ),
         }

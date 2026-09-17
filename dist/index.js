@@ -16,6 +16,7 @@ if (api._version != API_VERSION) {
     console.warn(`[@decky/api] Requested API version ${API_VERSION} but the running loader only supports version ${api._version}. Some features may not work.`);
 }
 const callable = api.callable;
+const toaster = api.toaster;
 const definePlugin = (fn) => {
     return (...args) => {
         return fn(...args);
@@ -80,12 +81,15 @@ function IconBase(props) {
 // THIS FILE IS AUTO GENERATED
 function FaRobot (props) {
   return GenIcon({"attr":{"viewBox":"0 0 640 512"},"child":[{"tag":"path","attr":{"d":"M32,224H64V416H32A31.96166,31.96166,0,0,1,0,384V256A31.96166,31.96166,0,0,1,32,224Zm512-48V448a64.06328,64.06328,0,0,1-64,64H160a64.06328,64.06328,0,0,1-64-64V176a79.974,79.974,0,0,1,80-80H288V32a32,32,0,0,1,64,0V96H464A79.974,79.974,0,0,1,544,176ZM264,256a40,40,0,1,0-40,40A39.997,39.997,0,0,0,264,256Zm-8,128H192v32h64Zm96,0H288v32h64ZM456,256a40,40,0,1,0-40,40A39.997,39.997,0,0,0,456,256Zm-8,128H384v32h64ZM640,256V384a31.96166,31.96166,0,0,1-32,32H576V224h32A31.96166,31.96166,0,0,1,640,256Z"},"child":[]}]})(props);
+}function FaDownload (props) {
+  return GenIcon({"attr":{"viewBox":"0 0 512 512"},"child":[{"tag":"path","attr":{"d":"M216 0h80c13.3 0 24 10.7 24 24v168h87.7c17.8 0 26.7 21.5 14.1 34.1L269.7 378.3c-7.5 7.5-19.8 7.5-27.3 0L90.1 226.1c-12.6-12.6-3.7-34.1 14.1-34.1H192V24c0-13.3 10.7-24 24-24zm296 376v112c0 13.3-10.7 24-24 24H24c-13.3 0-24-10.7-24-24V376c0-13.3 10.7-24 24-24h146.7l49 49c20.1 20.1 52.5 20.1 72.6 0l49-49H488c13.3 0 24 10.7 24 24zm-124 88c0-11-9-20-20-20s-20 9-20 20 9 20 20 20 20-9 20-20zm64 0c0-11-9-20-20-20s-20 9-20 20 9 20 20 20 20-9 20-20z"},"child":[]}]})(props);
 }
 
 const getStatus = callable("get_status");
 const setService = callable("set_service");
 const setAutostart = callable("set_autostart");
 const setKeepAwake = callable("set_keep_awake");
+const updateAll = callable("update_all");
 function formatSize(size) {
     const units = ["B", "KB", "MB", "GB", "TB"];
     let value = size;
@@ -127,7 +131,7 @@ function Content() {
     const run = async (op) => {
         setBusy(true);
         try {
-            await op();
+            return await op();
         }
         finally {
             setBusy(false);
@@ -137,6 +141,43 @@ function Content() {
     if (!status) {
         return (SP_JSX.jsx(DFL.PanelSection, { title: "Ollama Deck", children: SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsx("div", { style: { color: "#8b8b8b", padding: "8px 0" }, children: "Loading\u2026" }) }) }));
     }
+    const doUpdate = async () => {
+        setBusy(true);
+        let res;
+        try {
+            res = await updateAll();
+            const o = res.ollama;
+            const body = o.before && o.after && o.before !== o.after
+                ? `Ollama ${o.before} -> ${o.after}`
+                : `Ollama ${o.after ?? "?"}`;
+            const okModels = res.models.filter((m) => m.ok).length;
+            const failed = res.models.filter((m) => !m.ok);
+            const modelSummary = res.models.length
+                ? `${okModels}/${res.models.length} modelos`
+                : "sem modelos para atualizar";
+            toaster.toast({
+                title: res.ok ? "Update concluído" : "Update com falhas",
+                body: `${body} · ${modelSummary}` +
+                    (failed.length
+                        ? ` · falhou: ${failed.map((m) => m.model).join(", ")}`
+                        : ""),
+                critical: !res.ok,
+                duration: 8000
+            });
+        }
+        catch (err) {
+            console.error("update_all failed", err);
+            toaster.toast({
+                title: "Update falhou",
+                body: String(err),
+                critical: true
+            });
+        }
+        finally {
+            setBusy(false);
+            await refresh();
+        }
+    };
     return (SP_JSX.jsxs(DFL.PanelSection, { title: "Ollama Deck", children: [SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsxs("div", { style: { display: "flex", alignItems: "center", color: "#e6e6e6" }, children: [SP_JSX.jsx(StatusDot, { ok: status.service_active && status.api_reachable }), SP_JSX.jsxs("span", { children: [status.service_active
                                     ? status.api_reachable
                                         ? "Serving"
@@ -149,7 +190,11 @@ function Content() {
                             : "Ativar para impedir a suspensão do Deck."
                         : "Eficaz enquanto o serviço estiver ativo.", checked: status.keep_awake, disabled: busy, onChange: (on) => run(() => setKeepAwake(on)) }) }), SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsx(DFL.ToggleField, { label: "Start with Steam Deck", description: status.autostart
                         ? "O serviço arranca com a sessão do utilizador."
-                        : "O serviço arranca apenas por pedido.", checked: status.autostart, disabled: busy, onChange: (on) => run(() => setAutostart(on)) }) }), status.api_url && status.service_active ? (SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsxs("div", { style: { color: "#8b8b8b", fontSize: "12px" }, children: ["API: ", status.api_url] }) })) : null, status.models.length > 0 ? (SP_JSX.jsx(DFL.PanelSection, { title: "Models", children: status.models.map((m) => (SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsxs("div", { style: {
+                        : "O serviço arranca apenas por pedido.", checked: status.autostart, disabled: busy, onChange: (on) => run(() => setAutostart(on)) }) }), status.api_url && status.service_active ? (SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsxs("div", { style: { color: "#8b8b8b", fontSize: "12px" }, children: ["API: ", status.api_url] }) })) : null, SP_JSX.jsxs(DFL.PanelSection, { title: "Updates", children: [SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsxs(DFL.ButtonItem, { layout: "below", disabled: busy, onClick: doUpdate, description: status.service_active
+                                ? "Atualiza o binário e faz pull dos modelos instalados."
+                                : "Atualiza o binário; os modelos listados serão puxados.", children: [SP_JSX.jsx(FaDownload, { style: { marginRight: "8px", verticalAlign: "middle" } }), "Update Ollama & models"] }) }), SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsx("div", { style: { color: "#8b8b8b", fontSize: "12px" }, children: busy
+                                ? "A atualizar… a inferência fica em pausa."
+                                : `Versão atual: ${status.version ?? "—"}. Modelos: ${status.models.length}.` }) })] }), status.models.length > 0 ? (SP_JSX.jsx(DFL.PanelSection, { title: "Models", children: status.models.map((m) => (SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsxs("div", { style: {
                             display: "flex",
                             justifyContent: "space-between",
                             color: "#e6e6e6"

@@ -38,3 +38,21 @@ def test_read_host_fallback():
 def test_install_unit_returns_false_without_binary():
     # LAN_BIN absent in this container
     assert main.install_unit() is False
+
+
+def test_ollama_bin_env_ld_library_path():
+    env = main.ollama_bin_env()
+    assert main.OLLAMA_ROOT + "/lib/ollama" in env["LD_LIBRARY_PATH"]
+    assert main.OLLAMA_ROOT + "/bin" in env["PATH"]
+
+
+def test_ollama_arch_map():
+    assert main.OLLAMA_ARCH in ("amd64", "arm64", None)
+
+
+def test_update_unsupported_arch_returns_false(monkeypatch):
+    import asyncio
+    monkeypatch.setattr(main, "OLLAMA_ARCH", None)
+    ok, err = asyncio.run(main.update_ollama_bin())
+    assert not ok
+    assert "arquitetura" in err

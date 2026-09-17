@@ -13,20 +13,35 @@ Steam Deck com GPU (Vulkan/RADV).
 - **Painel de estado** — serviço ativo, versão do Ollama, URL da API
   (incl. IP LAN para acesso remoto), reachability e lista de modelos instalados
   (nome/tamanho/família).
+- **Update Ollama & models** — atualiza o binário do Ollama (download oficial,
+  sem sudo) e faz *pull* dos modelos instalados, tudo a partir do plugin.
 
-O plugin corre **sem privilégios root** e **não modifica** a instalação do
-Ollama nem o seu unit file pré-existente.
+Em execução normal, o plugin corre **sem privilégios root** e **não modifica**
+a instalação do Ollama nem o seu unit file pré-existente. As atualizações são
+sempre explícitas (botão no plugin).
 
 ## Requisitos
 
 - Steam Deck com Decky Loader instalado.
-- Ollama em `/home/deck/.local/share/ollama-bin/`.
-  Na primeira execução, se o unit `ollama.service` não existir, o plugin cria-o
-  a partir de um template padrão (Vulkan + `OLLAMA_HOST=0.0.0.0`).
+- Ollama em `/home/deck/.local/share/ollama-bin/` (o instalador abaixo instala-o
+  automaticamente se estiver ausente). Na primeira execução, se o unit
+  `ollama.service` não existir, o plugin cria-o a partir de um template padrão
+  (Vulkan + `OLLAMA_HOST=0.0.0.0`).
 
 ## Instalação
 
-### Manual (recomendado)
+### Rápida (recomendado)
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/linuxkafe/Ollama-Deck/main/install.sh | sh
+```
+
+O instalador descarrega o plugin da `main`, instala-o em
+`/home/deck/homebrew/plugins/ollama-deck` (pede sudo apenas para essa pasta),
+instala o Ollama se faltar e reinicia o `plugin_loader`. Para forçar outra
+branch: `OLLAMA_DECK_BRANCH=v1.0.0 curl -fsSL ... | sh`.
+
+### Manual
 
 ```bash
 # na máquina de desenvolvimento
@@ -41,10 +56,14 @@ sudo cp -r /tmp/ollama-deck /home/deck/homebrew/plugins/ollama-deck
 Depois recarrega o Decky (Definições > Reload) ou
 `sudo systemctl restart plugin_loader`.
 
-### A partir do repositório
+### Atualizações
 
-Copia o repo (ou apenas o conteúdo) para
-`/home/deck/homebrew/plugins/ollama-deck` seguindo os mesmos passos.
+- **Plugin**: volta a correr o instalador rápido (`curl | sh`); o(s) backup(s)
+  anterior(es) ficam em `ollama-deck.bak.<timestamp>`.
+- **Ollama + modelos**: no plugin, secção **Updates**, botão
+  *Update Ollama &amp; models* — stop do serviço, descarrega e extrai o tarball
+  oficial para `~/.local/share/ollama-bin`, arranca de novo e faz `ollama pull`
+  de cada modelo instalado (e de tags extra em `model_tags` no settings).
 
 ## Uso
 
@@ -78,9 +97,10 @@ python3 scripts/smoke_test.py
 ## Estrutura
 
 ```
-main.py            backend (systemctl, systemd-inhibit, API, settings)
+main.py            backend (systemctl, systemd-inhibit, update, API, settings)
 src/index.tsx      frontend React (@decky/ui)
 plugin.json        metadados Decky
+install.sh         instalador curl | sh
 dist/index.js      bundle compilado (commitado — o Decky carrega daqui)
 scripts/smoke_test.py   teste de integração no Deck
 tests/test_main.py      testes unitários offline
