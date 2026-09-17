@@ -50,3 +50,15 @@ Registo de aprendizagens relevantes da análise hostil (fase de plan).
 - **Origin**: leitura do unit + `curl` ao API.
 - **Impact**: o plugin apenas reflete o endereço; risco documentado no README.
 - **Applied To**: painel mostra URL da API dinamicamente (LAN vs localhost).
+
+## [Decky] — Diretório de settings usa o `name` do plugin.json
+- **Task**: T003
+- **Insight**: `DECKY_PLUGIN_SETTINGS_DIR` default =
+  `$HOME/homebrew/settings/<name>` com espaços/case exatos do `name` em
+  `plugin.json` (ex.: "Ollama Deck"), não o nome do diretório do plugin.
+- **Origin**: assumption INFERRED na análise hostil + listagem de
+  `/home/deck/homebrew/settings/` no Deck (ControllerTools, Lossless Scaling…).
+- **Impact**: sem esta correção, o CLI e a UI partilhariam `keep-awake`/
+  `model_tags` de modo incorreto (pastas diferentes).
+- **Applied To**: `cli.default_settings_dir()` derivado do `name`.
+- **Date**: 2026-09-17

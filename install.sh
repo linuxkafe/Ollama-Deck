@@ -99,6 +99,22 @@ if [ -n "$sudo_cmd" ]; then
   [ -n "$owner" ] && $sudo_cmd chown -R "$owner" "$dest"
 fi
 
+# CLI wrapper (ollama-deck on|off|status|...)
+deck_home=""
+case "$plugins_dir" in
+  /home/*/homebrew/plugins) deck_home=${plugins_dir%/homebrew/plugins} ;;
+  *) deck_home="$HOME" ;;
+esac
+bin_dir="$deck_home/.local/bin"
+$sudo_cmd mkdir -p "$bin_dir"
+cli_wrapper="$bin_dir/ollama-deck"
+printf '#!/bin/sh\nexec python3 %s/cli.py "$@"\n' "$dest" | $sudo_cmd tee "$cli_wrapper" >/dev/null
+$sudo_cmd chmod +x "$cli_wrapper"
+case ":$PATH:" in
+  *":$bin_dir:"*) ;;
+  *) say "Dica: adiciona $bin_dir ao PATH para usar 'ollama-deck' diretamente." ;;
+esac
+
 say "Plugin files installed. Restarting the Decky loader..."
 if command -v systemctl >/dev/null 2>&1; then
   $sudo_cmd systemctl restart plugin_loader 2>/dev/null \

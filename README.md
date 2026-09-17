@@ -74,6 +74,33 @@ Depois recarrega o Decky (Definições > Reload) ou
    - (opcional) ativa **Start with Steam Deck** para iniciar com a sessão.
 3. O painel mostra versão, URL da API e modelos instalados.
 
+## Linha de comandos (SSH)
+
+O instalador (curl|sh) coloca o comando `ollama-deck` em `~/.local/bin/`
+(mesmo backend do plugin — partilha as settings e o keep-awake com a UI):
+
+```bash
+# se ~/.local/bin não estiver no PATH:
+export PATH="$HOME/.local/bin:$PATH"
+
+ollama-deck on            # liga o serviço Ollama
+ollama-deck off           # desliga o serviço
+ollama-deck status        # estado atual (humano)
+ollama-deck status --json # estado em JSON (para scripts)
+ollama-deck enable        # auto-arranque com a sessão
+ollama-deck disable       # sem auto-arranque
+ollama-deck awake         # alterna keep-deck-awake
+ollama-deck awake on      # bloqueia a suspensão (quando o serviço estiver ativo)
+ollama-deck awake off     # liberta o bloqueio
+ollama-deck update        # atualiza o Ollama + modelos instalados
+ollama-deck pull <model>  # faz pull/atualiza um modelo
+```
+
+Exit codes: `0` sucesso, `1` erro de runtime, `2` uso incorreto. Deve correr
+como o utilizador `deck` (não como root). O `awake on` só bloqueia a suspensão
+enquanto o serviço estiver ativo; se for ativado com o serviço parado, fica
+registado e passa a bloquear quando o serviço arrancar.
+
 API remota (se `OLLAMA_HOST=0.0.0.0`): qualquer cliente na LAN pode usar
 `http://<IP_DO_DECK>:11434`.
 
@@ -101,9 +128,10 @@ main.py            backend (systemctl, systemd-inhibit, update, API, settings)
 src/index.tsx      frontend React (@decky/ui)
 plugin.json        metadados Decky
 install.sh         instalador curl | sh
+cli.py             CLI (ollama-deck on|off|status|...) — mesmo backend
 dist/index.js      bundle compilado (commitado — o Decky carrega daqui)
 scripts/smoke_test.py   teste de integração no Deck
-tests/test_main.py      testes unitários offline
+tests/             testes unitários offline (main + cli)
 docs/              VISION, REQUIREMENTS, ROADMAP, DESIGN, CHECKLIST
 ```
 

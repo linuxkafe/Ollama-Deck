@@ -1,0 +1,154 @@
+import sys
+import os
+
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
+import cli  # noqa: E402
+import pytest  # noqa: E402
+
+
+class FakePlugin:
+    def __init__(self):
+        self.calls = []
+
+    async def set_service(self, on):
+        self.calls.append(("set_service", on))
+        return {"ok": True, "service_active": on}
+
+    async def set_autostart(self, on):
+        self.calls.append(("set_autostart", on))
+        return {"ok": True, "autostart": on}
+
+    async def set_keep_awake(self, on):
+        self.calls.append(("set_keep_awake", on))
+        return {"ok": True, "keep_awake": on, "keep_awake_locked": on}
+
+    async def get_status(self):
+        self.calls.append(("get_status",))
+        return {
+            "service_active": True,
+            "autostart": True,
+            "keep_awake": False,
+            "keep_awake_locked": False,
+            "version": "X.Y.Z",
+            "api_reachable": True,
+            "models": [{"name": "m1", "size": 1024, "family": "llama", "quant": ""}],
+            "api_url": "http://127.0.0.1:11434",
+            "error": "",
+        }
+
+    async def update_all(self):
+        self.calls.append(("update_all",))
+        return {
+            "ok": True,
+            "ollama": {"before": "A", "after": "B", "ok": True, "error": ""},
+            "models": [],
+            "service_active": True,
+        }
+
+    async def _pull(self, model):
+        self.calls.append(("_pull", model))
+        return {"model": model, "ok": True, "detail": "success"}
+
+
+class BrokenPlugin(FakePlugin):
+    async def set_service(self, on):
+        return {"ok": False, "error": "systemctl start falhou"}
+
+
+def test_parser_requires_command():
+    with pytest.raises(SystemExit):
+        cli.build_parser().parse_args([])
+
+
+@pytest.mark.parametrize("cmd", ["on", "start", "off", "stop", "status", "enable",
+                                 "disable", "update"])
+def test_parser_accepts_simple_commands(cmd):
+    ns = cli.build_parser().parse_args([cmd])
+    assert ns.command in (cmd, {"start": "on", "stop": "off"}.get(cmd, cmd))
+
+
+def test_parser_awake_accepts_action():
+    assert cli.build_parser().parse_args(["awake", "on"]).action == "on"
+    assert cli.build_parser().parse_args(["awake"]).action is None
+
+
+def test_parser_pull_requires_model():
+    assert cli.build_parser().parse_args(["pull", "llama3"]).model == "llama3"
+    with pytest.raises(SystemExit):
+        cli.build_parser().parse_args(["pull"])
+
+
+def test_dispatch_on_off(capsys):
+    import asyncio
+    p = FakePlugin()
+    assert asyncio.run(cli.dispatch(cli.build_parser().parse_args(["on"]), p)) == 0
+    assert asyncio.run(cli.dispatch(cli.build_parser().parse_args(["off"]), p)) == 0
+    assert p.calls == [("set_service", True), ("set_service", False)]
+
+
+def test_dispatch_status_json(capsys):
+    import asyncio
+    p = FakePlugin()
+    rc = asyncio.run(cli.dispatch(cli.build_parser().parse_args(["status", "--json"]), p))
+    assert rc == 0
+    import json as _json
+    out = _json.loads(capsys.readouterr().out)
+    assert out["service_active"] is True
+
+
+def test_dispatch_awake_toggle(capsys):
+    import asyncio
+    p = FakePlugin()
+    assert asyncio.run(cli.dispatch(cli.build_parser().parse_args(["awake"]), p)) == 0
+    assert ("set_keep_awake", True) in p.calls  # status.keep_awake=False -> on
+
+
+def test_dispatch_enable_disable(capsys):
+    import asyncio
+    p = FakePlugin()
+    asyncio.run(cli.dispatch(cli.build_parser().parse_args(["disable"]), p))
+    assert ("set_autostart", False) in p.calls
+
+
+def test_dispatch_update_pull(capsys):
+    import asyncio
+    p = FakePlugin()
+    assert asyncio.run(cli.dispatch(cli.build_parser().parse_args(["update"]), p)) == 0
+    assert asyncio.run(cli.dispatch(cli.build_parser().parse_args(["pull", "qwen"]), p)) == 0
+    assert ("_pull", "qwen") in p.calls
+
+
+def test_dispatch_failure_returns_1(capsys):
+    import asyncio
+    p = BrokenPlugin()
+    assert asyncio.run(cli.dispatch(cli.build_parser().parse_args(["on"]), p)) == 1
+
+
+def test_format_status_human():
+    s = {
+        "service_active": True,
+        "autostart": False,
+        "keep_awake": True,
+        "keep_awake_locked": True,
+        "version": "0.34.1",
+        "api_reachable": True,
+        "models": [],
+        "api_url": "http://10.0.0.128:11434 (LAN)",
+        "error": "",
+    }
+    text = cli._format_status(s, as_json=False)
+    assert "0.34.1" in text
+    assert "suspensão bloqueada" in text
+    assert "LAN" in text
+
+
+def test_settings_dir_default_points_to_decky(monkeypatch):
+    monkeypatch.delenv("DECKY_PLUGIN_SETTINGS_DIR", raising=False)
+    monkeypatch.setattr("os.path.expanduser", lambda p: "/home/deck" + p[1:])
+    assert cli.default_settings_dir() == "/home/deck/homebrew/settings/Ollama Deck"
+
+
+def test_main_refuses_root(monkeypatch):
+    monkeypatch.setattr("os.geteuid", lambda: 0)
+    assert cli.main(["on"]) == 2
