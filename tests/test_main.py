@@ -1,6 +1,8 @@
 import sys
 import os
 
+import pytest
+
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 import main  # noqa: E402
@@ -14,6 +16,21 @@ def test_user_env_runtime_dir():
 def test_user_env_bus_socket():
     env = main._user_env()
     assert env["DBUS_SESSION_BUS_ADDRESS"].endswith("/bus")
+
+
+@pytest.mark.parametrize("original", [None, "", "/usr/local/lib"])
+def test_user_env_restores_system_libraries(monkeypatch, original):
+    monkeypatch.setenv("LD_LIBRARY_PATH", "/tmp/_MEIdecky")
+    if original is None:
+        monkeypatch.delenv("LD_LIBRARY_PATH_ORIG", raising=False)
+    else:
+        monkeypatch.setenv("LD_LIBRARY_PATH_ORIG", original)
+    env = main._user_env()
+    if original:
+        assert env["LD_LIBRARY_PATH"] == original
+    else:
+        assert "LD_LIBRARY_PATH" not in env
+    assert os.environ["LD_LIBRARY_PATH"] == "/tmp/_MEIdecky"
 
 
 def test_format_size_bytes():

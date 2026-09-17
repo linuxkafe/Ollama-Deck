@@ -23,3 +23,4 @@
 | NFR-3 | Latência UI aceitável (< 2s por ação). | Smoke: chamadas < 2s. |
 | NFR-4 | Build reprodutível (`npm ci` + `npm run build`). | CI/terminal local. |
 | NFR-5 | Segurança: plugin não expõe novos portos; apenas reflete `OLLAMA_HOST` existente. | Revisão de código. |
+| NFR-6 | Subprocessos systemctl/systemd-run usam LD_LIBRARY_PATH_ORIG, ou removem LD_LIBRARY_PATH quando ausente/vazio, evitando conflito com bibliotecas do Decky/PyInstaller sem alterar o ambiente do plugin. | `test_user_env_restores_system_libraries`; validação no Deck com ambiente do loader. |

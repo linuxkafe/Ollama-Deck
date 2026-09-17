@@ -64,6 +64,11 @@ def settings_dir() -> str:
 
 def _user_env() -> dict:
     env = os.environ.copy()
+    original_library_path = env.get("LD_LIBRARY_PATH_ORIG")
+    if original_library_path:
+        env["LD_LIBRARY_PATH"] = original_library_path
+    else:
+        env.pop("LD_LIBRARY_PATH", None)
     uid = str(os.getuid())
     env.setdefault("XDG_RUNTIME_DIR", f"/run/user/{uid}")
     env.setdefault("DBUS_SESSION_BUS_ADDRESS", f"unix:path=/run/user/{uid}/bus")
