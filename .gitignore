@@ -1,0 +1,15 @@
+# AES project internals (never published)
+aes/
+.aes/
+
+# Node / build artifacts (dist/ IS committed for Decky loading)
+node_modules/
+npm-debug.log*
+
+# Python
+__pycache__/
+*.pyc
+
+# Local
+.env
+*.tar.gz

@@ -1,0 +1,25 @@
+# Requirements — Ollama-Deck
+
+## Functional Requirements
+
+| ID | Requisito | Verificável por |
+|----|-----------|-----------------|
+| FR-1 | O plugin apresenta um painel no menu Decky (quick access). | Frontend carrega em Decky; `dist/index.js` presente. |
+| FR-2 | Toggle "Ollama Service": ON → `systemctl --user start ollama`; OFF → `systemctl --user stop ollama`. | Smoke test no Deck muda estado do unit. |
+| FR-3 | Toggle "Keep Deck Awake": enquanto serviço ativo, mantém `systemd-inhibit --what=sleep:idle --who=Ollama-Deck --mode=block sleep infinity`. Libertado quando OFF ou serviço OFF. | Smoke test verifica processo inhibitor presente/ausente. |
+| FR-4 | Toggle "Start with Steam Deck": ON → `systemctl --user enable`, OFF → `disable`. | `systemctl --user is-enabled ollama` reflete o toggle. |
+| FR-5 | Painel mostra: `service_active`, `autostart`, `keep_awake_locked`, versão Ollama, `api_reachable`, URL da API, lista de modelos (**nome**, **tamanho**, **família**). | `get_status()` devolve campos; smoke test imprime. |
+| FR-6 | Plugin corre sem root (sem flag `root`). | plugin.json sem flag root; processo plugin corre com uid 1000. |
+| FR-7 | Cleanup: reload/crash do plugin não deixa inhibitor órfão permanente. | `reap_stragglers()` em `_main`; smoke test e revisão de código. |
+| FR-8 | Se o unit `ollama.service` estiver ausente mas o binário existir, o plugin cria o unit padrão (idempotente). | `install_unit()`; smoke test em estado limpo. |
+| FR-9 | Persistência do toggle keep-awake entre reloads (`settings.json`). | Ficheiro criado em `DECKY_PLUGIN_SETTINGS_DIR`. |
+
+## Non-Functional Requirements
+
+| ID | Requisito | Verificável por |
+|----|-----------|-----------------|
+| NFR-1 | Não altera ficheiros de infraestrutura existentes (unit, ollama-bin). | Diff de repo + smoke (unit pré-existente intocado). |
+| NFR-2 | Backend resiliente a bus/DBus indisponível — erros reportados sem crash. | smoke com systemctl a falhar devolve `error`. |
+| NFR-3 | Latência UI aceitável (< 2s por ação). | Smoke: chamadas < 2s. |
+| NFR-4 | Build reprodutível (`npm ci` + `npm run build`). | CI/terminal local. |
+| NFR-5 | Segurança: plugin não expõe novos portos; apenas reflete `OLLAMA_HOST` existente. | Revisão de código. |

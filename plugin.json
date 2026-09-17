@@ -1,0 +1,10 @@
+{
+  "name": "Ollama Deck",
+  "author": "linuxkafe",
+  "api_version": 1,
+  "flags": [],
+  "publish": {
+    "tags": ["ollama", "llm", "ai", "vulkan", "utility", "service"],
+    "description": "Serve e controla o serviço Ollama no Steam Deck: liga/desliga on demand, impede a suspensão do Deck durante inferências e mostra estado, versão e modelos instalados."
+  }
+}
