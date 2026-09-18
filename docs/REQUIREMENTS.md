@@ -13,6 +13,8 @@
 | FR-7 | Cleanup: reload/crash do plugin não deixa inhibitor órfão permanente. | `reap_stragglers()` em `_main`; smoke test e revisão de código. |
 | FR-8 | Se o unit `ollama.service` estiver ausente mas o binário existir, o plugin cria o unit padrão (idempotente). | `install_unit()`; smoke test em estado limpo. |
 | FR-9 | Persistência do toggle keep-awake entre reloads (`settings.json`). | Ficheiro criado em `DECKY_PLUGIN_SETTINGS_DIR`. |
+| FR-10 | Botão "Instalar modelo" abre modal para pull de novo modelo (ex: llama3.2). Requer serviço ativo. | UI abre modal, chamada `pull_model`, toaster mostra resultado. |
+| FR-11 | Botão de remoção por modelo com confirmação — chama `delete_model` (`ollama rm`). | UI mostra confirmação, chamada `delete_model`, toaster mostra resultado. |
 
 ## Non-Functional Requirements
 

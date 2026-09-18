@@ -11,6 +11,9 @@ Usage:
     ollama-deck awake [on|off]         keep-deck-awake (sem arg, alterna)
     ollama-deck update                 atualiza binário do Ollama + modelos
     ollama-deck pull <model>           faz pull de um modelo
+    ollama-deck rm <model>             remove um modelo
+    ollama-deck chat <prompt>          envia prompt ao Ollama (requer serviço ativo)
+    ollama-deck lan-info [--json]      mostra como ligar ao Ollama pela LAN
 
 Exit codes: 0 ok, 1 erro de runtime, 2 erro de utilização.
 """
@@ -75,6 +78,15 @@ def build_parser() -> argparse.ArgumentParser:
 
     pull = sub.add_parser("pull", parents=[parent], help="faz pull/atualiza um modelo")
     pull.add_argument("model")
+
+    rm = sub.add_parser("rm", parents=[parent], help="remove um modelo instalado")
+    rm.add_argument("model")
+
+    chat = sub.add_parser("chat", parents=[parent], help="envia prompt ao Ollama")
+    chat.add_argument("prompt")
+    chat.add_argument("--model", help="modelo a usar (default: primeiro disponível)")
+
+    lan_info = sub.add_parser("lan-info", parents=[parent], help="mostra como ligar ao Ollama pela LAN")
 
     return parser
 
@@ -166,6 +178,49 @@ async def cmd_pull(plugin, model: str) -> int:
     return 0 if res["ok"] else 1
 
 
+async def cmd_rm(plugin, model: str) -> int:
+    res = await plugin.delete_model(model)
+    print(f"[{'ok' if res['ok'] else 'FALHOU'}] {model}: {res['detail'][:120]}")
+    return 0 if res["ok"] else 1
+
+
+async def cmd_chat(plugin, prompt: str, model: str | None) -> int:
+    if model is None:
+        status = await plugin.get_status()
+        models = status.get("models") or []
+        if not models:
+            print("erro: nenhum modelo disponível", file=sys.stderr)
+            return 1
+        model = models[0]["name"]
+    res = await plugin.chat(model, prompt)
+    if not res.get("ok"):
+        print(f"erro: {res.get('error', 'desconhecido')}", file=sys.stderr)
+        return 1
+    print(res.get("response", ""))
+    return 0
+
+
+async def cmd_lan_info(plugin, as_json: bool) -> int:
+    res = await plugin.lan_info()
+    if not res.get("ok"):
+        print(f"erro: {res.get('error', 'desconhecido')}", file=sys.stderr)
+        return 1
+    if as_json:
+        import json as _json
+        print(_json.dumps(res, indent=2, default=str))
+        return 0
+    print(f"Endereço base: {res.get('base_url')}")
+    print(f"Porta: {res.get('port')}")
+    print(f"Modelos: {', '.join(res.get('models') or [])}")
+    warning = res.get("warning")
+    if warning:
+        print(f"\n⚠️  {warning}")
+    print("\nExemplos:")
+    for lang, cmd in (res.get("examples") or {}).items():
+        print(f"  [{lang}] {cmd}")
+    return 0
+
+
 async def dispatch(args, plugin) -> int:
     command = args.command
     if command in ("on", "start"):
@@ -184,6 +239,12 @@ async def dispatch(args, plugin) -> int:
         return await cmd_update(plugin)
     if command == "pull":
         return await cmd_pull(plugin, args.model)
+    if command == "rm":
+        return await cmd_rm(plugin, args.model)
+    if command == "chat":
+        return await cmd_chat(plugin, args.prompt, args.model)
+    if command == "lan-info":
+        return await cmd_lan_info(plugin, args.json)
     print(f"erro: comando desconhecido: {command}", file=sys.stderr)
     return 2
 

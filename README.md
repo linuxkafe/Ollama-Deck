@@ -13,6 +13,10 @@ Steam Deck com GPU (Vulkan/RADV).
 - **Painel de estado** — serviço ativo, versão do Ollama, URL da API
   (incl. IP LAN para acesso remoto), reachability e lista de modelos instalados
   (nome/tamanho/família).
+- **Chat com Ollama** — envia prompts e recebe respostas diretamente no overlay
+  do Decky (Gaming Mode), com seleção de modelo e histórico da sessão.
+- **Info de conexão LAN** — mostra endereço, porta e exemplos de uso (curl,
+  Python, JavaScript) para ligar a partir de outros equipamentos na rede.
 - **Update Ollama & models** — atualiza o binário do Ollama (download oficial,
   sem sudo) e faz *pull* dos modelos instalados, tudo a partir do plugin.
 
@@ -94,12 +98,34 @@ ollama-deck awake on      # bloqueia a suspensão (quando o serviço estiver ati
 ollama-deck awake off     # liberta o bloqueio
 ollama-deck update        # atualiza o Ollama + modelos instalados
 ollama-deck pull <model>  # faz pull/atualiza um modelo
+ollama-deck rm <model>    # remove um modelo instalado
+ollama-deck chat <prompt> # envia prompt ao Ollama (requer serviço ativo)
+ollama-deck lan-info      # mostra como ligar ao Ollama pela LAN
+ollama-deck lan-info --json # info LAN em JSON
 ```
 
 Exit codes: `0` sucesso, `1` erro de runtime, `2` uso incorreto. Deve correr
 como o utilizador `deck` (não como root). O `awake on` só bloqueia a suspensão
 enquanto o serviço estiver ativo; se for ativado com o serviço parado, fica
 registado e passa a bloquear quando o serviço arrancar.
+
+**Chat via CLI:**
+```bash
+ollama-deck chat "Explica quantum computing em português"
+ollama-deck chat "Escreve um hello world em Rust" --model llama3.2
+```
+
+**Info LAN via CLI:**
+```bash
+ollama-deck lan-info
+# Endereço base: http://10.0.0.128:11434
+# Porta: 11434
+# Modelos: llama3.2, mistral:7b
+#
+# Exemplos:
+#   [curl] curl -X POST http://10.0.0.128:11434/api/generate ...
+#   [python] import requests ...
+```
 
 API remota (se `OLLAMA_HOST=0.0.0.0`): qualquer cliente na LAN pode usar
 `http://<IP_DO_DECK>:11434`.

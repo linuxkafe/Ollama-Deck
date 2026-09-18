@@ -37,6 +37,25 @@ class FakePlugin:
             "error": "",
         }
 
+    async def chat(self, model, prompt):
+        self.calls.append(("chat", model, prompt))
+        return {"ok": True, "response": "Hello from Ollama!", "model": model}
+
+    async def lan_info(self):
+        self.calls.append(("lan_info",))
+        return {
+            "ok": True,
+            "bind_address": "10.0.0.128",
+            "port": 11434,
+            "base_url": "http://10.0.0.128:11434",
+            "models": ["m1"],
+            "warning": "⚠️ Ollama is bound to 0.0.0.0 — API is exposed on LAN without authentication.",
+            "examples": {
+                "curl": "curl -X POST http://10.0.0.128:11434/api/generate -d '{\"model\": \"llama3.2\", \"prompt\": \"Hello\", \"stream\": false}'",
+                "python": "import requests\nrequests.post(\"http://10.0.0.128:11434/api/generate\", json={\"model\": \"llama3.2\", \"prompt\": \"Hello\", \"stream\": False})",
+            },
+        }
+
     async def update_all(self):
         self.calls.append(("update_all",))
         return {
@@ -152,3 +171,58 @@ def test_settings_dir_default_points_to_decky(monkeypatch):
 def test_main_refuses_root(monkeypatch):
     monkeypatch.setattr("os.geteuid", lambda: 0)
     assert cli.main(["on"]) == 2
+
+
+def test_dispatch_chat(capsys):
+    import asyncio
+    p = FakePlugin()
+    rc = asyncio.run(cli.dispatch(cli.build_parser().parse_args(["chat", "hello world"]), p))
+    assert rc == 0
+    assert ("chat", "m1", "hello world") in p.calls
+    out = capsys.readouterr().out
+    assert "Hello from Ollama!" in out
+
+
+def test_dispatch_chat_with_model(capsys):
+    import asyncio
+    p = FakePlugin()
+    rc = asyncio.run(cli.dispatch(cli.build_parser().parse_args(["chat", "hello", "--model", "llama3.2"]), p))
+    assert rc == 0
+    assert ("chat", "llama3.2", "hello") in p.calls
+
+
+def test_dispatch_chat_failure(capsys):
+    import asyncio
+
+    class FailingPlugin(FakePlugin):
+        async def chat(self, model, prompt):
+            return {"ok": False, "error": "model not found"}
+
+    p = FailingPlugin()
+    rc = asyncio.run(cli.dispatch(cli.build_parser().parse_args(["chat", "hello"]), p))
+    assert rc == 1
+    err = capsys.readouterr().err
+    assert "model not found" in err
+
+
+def test_dispatch_lan_info(capsys):
+    import asyncio
+    p = FakePlugin()
+    rc = asyncio.run(cli.dispatch(cli.build_parser().parse_args(["lan-info"]), p))
+    assert rc == 0
+    assert ("lan_info",) in p.calls
+    out = capsys.readouterr().out
+    assert "http://10.0.0.128:11434" in out
+    assert "curl" in out
+    assert "python" in out
+
+
+def test_dispatch_lan_info_json(capsys):
+    import asyncio
+    p = FakePlugin()
+    rc = asyncio.run(cli.dispatch(cli.build_parser().parse_args(["lan-info", "--json"]), p))
+    assert rc == 0
+    import json as _json
+    out = _json.loads(capsys.readouterr().out)
+    assert out["base_url"] == "http://10.0.0.128:11434"
+    assert out["port"] == 11434

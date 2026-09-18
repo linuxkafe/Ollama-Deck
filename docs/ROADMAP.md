@@ -2,14 +2,19 @@
 
 ## Done (sprint-01)
 - [x] T001 Plugin Decky Ollama-Deck v1.0.0 (controlo on demand + keep-awake + estado).
+- [x] T004 Gestão de modelos: instalar (pull) e remover (rm) via UI e CLI.
+
+## Done (sprint-02)
+- [x] T005 Chat com Ollama no Gaming Mode + Info de conexão LAN.
 
 ## Backlog
 | Item | Impacto | Esforço | Prioridade | Estado |
 |------|---------|---------|-----------|--------|
-| Modelos: listar via API já incluído; adicionar pull/delete | Médio | Médio | Baixa | backlog |
 | Atualização do binário Ollama a partir do plugin | Médio | Baixo | Baixa | backlog |
 | Ligação à Web UI (open-webui) num clique | Baixo | Baixo | Baixa | backlog |
 | Indicador GPU/Vulkan (processo/vram) no painel | Baixo | Médio | Baixa | backlog |
+| Busca/seleção de modelos com quantização | Baixo | Médio | Baixa | backlog |
+| Histórico de chat persistente | Baixo | Médio | Baixa | backlog |
 
 ## Discovered
 - N/A neste sprint.

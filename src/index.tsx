@@ -50,11 +50,38 @@ type UpdateResult = {
   error: string;
 };
 
+type ChatMessage = {
+  role: "user" | "assistant";
+  content: string;
+};
+
+type ChatResult = {
+  ok: boolean;
+  response?: string;
+  model?: string;
+  error?: string;
+};
+
+type LanInfoResult = {
+  ok: boolean;
+  bind_address?: string;
+  port?: number;
+  base_url?: string;
+  examples?: Record<string, string>;
+  warning?: string;
+  models?: string[];
+  error?: string;
+};
+
 const getStatus = callable<[], Status>("get_status");
 const setService = callable<[on: boolean], { ok: boolean }>("set_service");
 const setAutostart = callable<[on: boolean], { ok: boolean }>("set_autostart");
 const setKeepAwake = callable<[on: boolean], { ok: boolean }>("set_keep_awake");
 const updateAll = callable<[], UpdateResult>("update_all");
+const pullModel = callable<[tag: string], { ok: boolean; error?: string }>("pull_model");
+const deleteModel = callable<[tag: string], { ok: boolean; error?: string }>("delete_model");
+const chat = callable<[model: string, prompt: string], ChatResult>("chat");
+const lanInfo = callable<[], LanInfoResult>("lan_info");
 
 function formatSize(size: number): string {
   const units = ["B", "KB", "MB", "GB", "TB"];
@@ -87,6 +114,15 @@ function StatusDot({ ok }: { ok: boolean }) {
 function Content() {
   const [status, setStatus] = useState<Status | null>(null);
   const [busy, setBusy] = useState(false);
+  const [pullModalOpen, setPullModalOpen] = useState(false);
+  const [pullModelName, setPullModelName] = useState("");
+  const [deleteConfirm, setDeleteConfirm] = useState<string | null>(null);
+  const [chatMessages, setChatMessages] = useState<ChatMessage[]>([]);
+  const [chatInput, setChatInput] = useState("");
+  const [chatModel, setChatModel] = useState("");
+  const [chatBusy, setChatBusy] = useState(false);
+  const [lanInfoData, setLanInfoData] = useState<LanInfoResult | null>(null);
+  const [lanInfoLoaded, setLanInfoLoaded] = useState(false);
 
   const refresh = async () => {
     try {
@@ -112,11 +148,171 @@ function Content() {
     }
   };
 
+  const doPull = async () => {
+    if (!pullModelName.trim()) return;
+    const tag = pullModelName.trim();
+    setPullModalOpen(false);
+    setPullModelName("");
+    setBusy(true);
+    try {
+      const res = await pullModel(tag);
+      if (!res.ok) {
+        toaster.toast({
+          title: "Pull falhou",
+          body: res.error || `Não foi possível instalar ${tag}`,
+          critical: true,
+        });
+      } else {
+        toaster.toast({
+          title: "Modelo instalado",
+          body: tag,
+        });
+      }
+    } catch (err) {
+      toaster.toast({
+        title: "Pull falhou",
+        body: String(err),
+        critical: true,
+      });
+    } finally {
+      setBusy(false);
+      await refresh();
+    }
+  };
+
+  const doDelete = async (tag: string) => {
+    setDeleteConfirm(null);
+    setBusy(true);
+    try {
+      const res = await deleteModel(tag);
+      if (!res.ok) {
+        toaster.toast({
+          title: "Remoção falhou",
+          body: res.error || `Não foi possível remover ${tag}`,
+          critical: true,
+        });
+      } else {
+        toaster.toast({
+          title: "Modelo removido",
+          body: tag,
+        });
+      }
+    } catch (err) {
+      toaster.toast({
+        title: "Remoção falhou",
+        body: String(err),
+        critical: true,
+      });
+    } finally {
+      setBusy(false);
+      await refresh();
+    }
+  };
+
+  const loadLanInfo = async () => {
+    if (lanInfoLoaded) return;
+    try {
+      const res = await lanInfo();
+      setLanInfoData(res);
+      setLanInfoLoaded(true);
+    } catch (err) {
+      console.error("lan_info failed", err);
+    }
+  };
+
+  const doChat = async () => {
+    if (!chatInput.trim() || !chatModel) return;
+    const prompt = chatInput.trim();
+    setChatInput("");
+    setChatBusy(true);
+    setChatMessages((prev) => [...prev, { role: "user", content: prompt }]);
+    try {
+      const res = await chat(chatModel, prompt);
+      if (!res.ok) {
+        toaster.toast({
+          title: "Chat falhou",
+          body: res.error || "Erro desconhecido",
+          critical: true,
+        });
+        setChatMessages((prev) => [...prev, { role: "assistant", content: `Erro: ${res.error}` }]);
+      } else {
+        setChatMessages((prev) => [...prev, { role: "assistant", content: res.response || "" }]);
+      }
+    } catch (err) {
+      toaster.toast({
+        title: "Chat falhou",
+        body: String(err),
+        critical: true,
+      });
+      setChatMessages((prev) => [...prev, { role: "assistant", content: `Erro: ${err}` }]);
+    } finally {
+      setChatBusy(false);
+    }
+  };
+
+  useEffect(() => {
+    if (status?.service_active) {
+      loadLanInfo();
+      if (status.models.length > 0 && !chatModel) {
+        setChatModel(status.models[0].name);
+      }
+    }
+  }, [status?.service_active, status?.models]);
+
   if (!status) {
     return (
       <PanelSection title="Ollama Deck">
         <PanelSectionRow>
           <div style={{ color: "#8b8b8b", padding: "8px 0" }}>Loading…</div>
+        </PanelSectionRow>
+      </PanelSection>
+    );
+  }
+
+  // Pull model modal
+  if (pullModalOpen) {
+    return (
+      <PanelSection title="Instalar modelo">
+        <PanelSectionRow>
+          <div style={{ color: "#8b8b8b", fontSize: "12px", marginBottom: "8px" }}>
+            Nome do modelo (ex: llama3.2, mistral:7b, codellama:13b)
+          </div>
+        </PanelSectionRow>
+        <PanelSectionRow>
+          <input
+            type="text"
+            value={pullModelName}
+            onChange={(e) => setPullModelName(e.target.value)}
+            placeholder="llama3.2"
+            style={{
+              width: "100%",
+              padding: "8px",
+              borderRadius: "4px",
+              border: "1px solid #4a4a4a",
+              background: "#1a1a1a",
+              color: "#fafafa",
+              fontSize: "14px",
+            }}
+            autoFocus
+            onKeyDown={(e) => e.key === "Enter" && doPull()}
+          />
+        </PanelSectionRow>
+        <PanelSectionRow>
+          <div style={{ display: "flex", gap: "8px", justifyContent: "flex-end" }}>
+            <ButtonItem
+              layout="inline"
+              onClick={() => setPullModalOpen(false)}
+            >
+              Cancelar
+            </ButtonItem>
+            <ButtonItem
+              layout="inline"
+              onClick={doPull}
+              disabled={busy || !pullModelName.trim()}
+            >
+              Instalar
+            </ButtonItem>
+          </div>
         </PanelSectionRow>
       </PanelSection>
     );
@@ -236,7 +432,7 @@ function Content() {
         </PanelSectionRow>
       ) : null}
 
-      <PanelSection title="Updates">
+<PanelSection title="Updates">
         <PanelSectionRow>
           <ButtonItem
             layout="below"
@@ -249,7 +445,18 @@ function Content() {
             }
           >
             <FaDownload style={{ marginRight: "8px", verticalAlign: "middle" }} />
-            Update Ollama &amp; models
+            Update Ollama & models
+          </ButtonItem>
+        </PanelSectionRow>
+        <PanelSectionRow>
+          <ButtonItem
+            layout="below"
+            disabled={busy || !status.service_active}
+            onClick={() => setPullModalOpen(true)}
+            description="Instala um novo modelo (ex: llama3.2, mistral:7b). Requer serviço ativo."
+          >
+            <FaDownload style={{ marginRight: "8px", verticalAlign: "middle" }} />
+            Instalar modelo
           </ButtonItem>
         </PanelSectionRow>
         <PanelSectionRow>
@@ -261,6 +468,139 @@ function Content() {
         </PanelSectionRow>
       </PanelSection>
 
+      {status.service_active && status.models.length > 0 ? (
+        <PanelSection title="Chat">
+          <PanelSectionRow>
+            <select
+              value={chatModel}
+              onChange={(e) => setChatModel(e.target.value)}
+              disabled={chatBusy}
+              style={{
+                width: "100%",
+                padding: "8px",
+                borderRadius: "4px",
+                border: "1px solid #4a4a4a",
+                background: "#1a1a1a",
+                color: "#fafafa",
+                fontSize: "14px",
+              }}
+            >
+              {status.models.map((m) => (
+                <option key={m.name} value={m.name}>
+                  {m.name}
+                </option>
+              ))}
+            </select>
+          </PanelSectionRow>
+          <PanelSectionRow>
+            <div
+              style={{
+                maxHeight: "200px",
+                overflowY: "auto",
+                marginBottom: "8px",
+                padding: "8px",
+                background: "#1a1a1a",
+                borderRadius: "4px",
+                border: "1px solid #4a4a4a",
+              }}
+            >
+              {chatMessages.map((msg, idx) => (
+                <div key={idx} style={{ marginBottom: "8px", padding: "8px", borderRadius: "4px", background: msg.role === "user" ? "#22c55e22" : "#22c55e11" }}>
+                  <div style={{ fontSize: "11px", color: "#8b8b8b", marginBottom: "4px" }}>
+                    {msg.role === "user" ? "Você" : "Ollama"}
+                  </div>
+                  <div style={{ color: "#fafafa", whiteSpace: "pre-wrap", wordBreak: "break-word" }}>
+                    {msg.content}
+                  </div>
+                </div>
+              ))}
+              {chatBusy && (
+                <div style={{ padding: "8px", color: "#22c55e" }}>
+                  ⋮ Ollama a pensar…
+                </div>
+              )}
+            </div>
+          </PanelSectionRow>
+          <PanelSectionRow>
+            <div style={{ display: "flex", gap: "8px" }}>
+              <input
+                type="text"
+                value={chatInput}
+                onChange={(e) => setChatInput(e.target.value)}
+                onKeyDown={(e) => e.key === "Enter" && !chatBusy && doChat()}
+                placeholder="Digite a sua pergunta…"
+                disabled={chatBusy || !chatModel}
+                style={{
+                  flex: 1,
+                  padding: "8px",
+                  borderRadius: "4px",
+                  border: "1px solid #4a4a4a",
+                  background: "#1a1a1a",
+                  color: "#fafafa",
+                  fontSize: "14px",
+                }}
+                autoFocus
+              />
+              <ButtonItem layout="inline" onClick={doChat} disabled={chatBusy || !chatInput.trim() || !chatModel}>
+                Enviar
+              </ButtonItem>
+            </div>
+          </PanelSectionRow>
+        </PanelSection>
+      ) : null}
+
+      {status.service_active ? (
+        <PanelSection title="Conexão LAN">
+          <PanelSectionRow>
+            <div style={{ color: "#8b8b8b", fontSize: "12px", marginBottom: "8px" }}>
+              Informação para ligar a partir de outros equipamentos na rede:
+            </div>
+          </PanelSectionRow>
+          {lanInfoData ? (
+            <>
+              {lanInfoData.warning && (
+                <PanelSectionRow>
+                  <div style={{ color: "#f43f5e", fontSize: "11px", padding: "8px", background: "#f43f5e11", borderRadius: "4px", border: "1px solid #f43f5e33" }}>
+                    {lanInfoData.warning}
+                  </div>
+                </PanelSectionRow>
+              )}
+              <PanelSectionRow>
+                <div style={{ color: "#e6e6e6", fontSize: "12px" }}>
+                  <strong>Endereço:</strong> {lanInfoData.base_url}
+                </div>
+              </PanelSectionRow>
+              <PanelSectionRow>
+                <div style={{ color: "#8b8b8b", fontSize: "11px", marginBottom: "8px" }}>
+                  Modelos disponíveis: {lanInfoData.models?.join(", ") || "nenhum"}
+                </div>
+              </PanelSectionRow>
+              <PanelSectionRow>
+                <div style={{ color: "#8b8b8b", fontSize: "11px", marginBottom: "8px" }}>
+                  Exemplos de uso:
+                </div>
+              </PanelSectionRow>
+              {lanInfoData.examples && Object.entries(lanInfoData.examples).map(([lang, cmd]) => (
+                <PanelSectionRow key={lang}>
+                  <div style={{ display: "flex", gap: "8px", alignItems: "center" }}>
+                    <code style={{ flex: 1, fontSize: "10px", background: "#1a1a1a", padding: "4px 8px", borderRadius: "4px", color: "#22c55e", whiteSpace: "pre-wrap", wordBreak: "break-all" }}>
+                      {cmd}
+                    </code>
+                    <ButtonItem layout="inline" onClick={() => navigator.clipboard.writeText(cmd)} disabled={busy}>
+                      Copiar
+                    </ButtonItem>
+                  </div>
+                </PanelSectionRow>
+              ))}
+            </>
+          ) : (
+            <PanelSectionRow>
+              <div style={{ color: "#8b8b8b", fontSize: "12px" }}>A carregar informação LAN…</div>
+            </PanelSectionRow>
+          )}
+        </PanelSection>
+      ) : null}
+
       {status.models.length > 0 ? (
         <PanelSection title="Models">
           {status.models.map((m) => (
@@ -269,14 +609,43 @@ function Content() {
                 style={{
                   display: "flex",
                   justifyContent: "space-between",
+                  alignItems: "center",
                   color: "#e6e6e6"
                 }}
               >
                 <span>{m.name}</span>
-                <span style={{ color: "#8b8b8b" }}>
-                  {m.family} · {formatSize(m.size)}
-                </span>
+                <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                  <span style={{ color: "#8b8b8b" }}>
+                    {m.family} · {formatSize(m.size)}
+                  </span>
+                  <ButtonItem
+                    layout="inline"
+                    disabled={busy || deleteConfirm === m.name}
+                    onClick={() => setDeleteConfirm(m.name)}
+                    description="Remove este modelo permanentemente"
+                  >
+                    🗑
+                  </ButtonItem>
+                </div>
               </div>
+              {deleteConfirm === m.name && (
+                <PanelSectionRow>
+                  <div style={{ display: "flex", gap: "8px", justifyContent: "flex-end" }}>
+                    <ButtonItem
+                      layout="inline"
+                      onClick={() => setDeleteConfirm(null)}
+                    >
+                      Cancelar
+                    </ButtonItem>
+                    <ButtonItem
+                      layout="inline"
+                      onClick={() => doDelete(m.name)}
+                    >
+                      Confirmar remoção
+                    </ButtonItem>
+                  </div>
+                </PanelSectionRow>
+              )}
             </PanelSectionRow>
           ))}
         </PanelSection>

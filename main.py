@@ -232,6 +232,31 @@ class OllamaApi:
             return None
 
     @staticmethod
+    def generate(model: str, prompt: str, stream: bool = False) -> Optional[dict]:
+        payload = json.dumps({"model": model, "prompt": prompt, "stream": stream}).encode()
+        req = urllib.request.Request(
+            API_BASE + "/api/generate",
+            data=payload,
+            headers={"Content-Type": "application/json"},
+            method="POST",
+        )
+        try:
+            with urllib.request.urlopen(req, timeout=120) as resp:
+                if stream:
+                    return resp
+                return json.loads(resp.read().decode())
+        except (OSError, ValueError) as e:
+            log(f"Ollama generate failed: {e}")
+            return None
+
+    @staticmethod
+    def chat(model: str, prompt: str) -> Optional[str]:
+        data = OllamaApi.generate(model, prompt, stream=False)
+        if data is None:
+            return None
+        return str(data.get("response", ""))
+
+    @staticmethod
     def version() -> Optional[str]:
         data = OllamaApi.call("/api/version")
         if data is None:
@@ -398,6 +423,68 @@ class Plugin:
                 s in detail.lower() for s in ("error", "failed", "not found")
             ),
             "detail": detail[:200],
+        }
+
+    async def _delete(self, tag: str) -> dict:
+        proc = await asyncio.create_subprocess_exec(
+            LAN_BIN,
+            "rm",
+            tag,
+            stdout=asyncio.subprocess.PIPE,
+            stderr=asyncio.subprocess.STDOUT,
+            env=ollama_bin_env(),
+        )
+        out, _ = await proc.communicate()
+        detail = out.decode(errors="replace").strip()
+        return {
+            "model": tag,
+            "ok": proc.returncode == 0,
+            "detail": detail[:200] if detail else "Modelo removido",
+        }
+
+    async def pull_model(self, tag: str) -> dict:
+        return await self._pull(tag)
+
+    async def delete_model(self, tag: str) -> dict:
+        return await self._delete(tag)
+
+    async def chat(self, model: str, prompt: str) -> dict:
+        if not await Systemctl.is_active():
+            return _fault("Ollama service is not running")
+        models = OllamaApi.models()
+        model_names = [m["name"] for m in models]
+        if model not in model_names:
+            return _fault(f"Model '{model}' not found. Available: {', '.join(model_names) or 'none'}")
+        response = OllamaApi.chat(model, prompt)
+        if response is None:
+            return _fault("Failed to get response from Ollama")
+        return {"ok": True, "response": response, "model": model}
+
+    async def lan_info(self) -> dict:
+        host = read_host()
+        ip = lan_ip()
+        if host in ("0.0.0.0", ""):
+            bind_addr = ip if ip else "127.0.0.1"
+        else:
+            bind_addr = host
+        port = 11434
+        base_url = f"http://{bind_addr}:{port}"
+        examples = {
+            "curl": f'curl -X POST {base_url}/api/generate -d \'{{"model": "llama3.2", "prompt": "Hello", "stream": false}}\'',
+            "python": f'import requests\nrequests.post("{base_url}/api/generate", json={{"model": "llama3.2", "prompt": "Hello", "stream": False}})',
+            "javascript": f'fetch("{base_url}/api/generate", {{method: "POST", headers: {{"Content-Type": "application/json"}}, body: JSON.stringify({{model: "llama3.2", prompt: "Hello", stream: false}})}})',
+        }
+        warning = ""
+        if bind_addr != "127.0.0.1":
+            warning = "⚠️ Ollama is bound to 0.0.0.0 — API is exposed on LAN without authentication."
+        return {
+            "ok": True,
+            "bind_address": bind_addr,
+            "port": port,
+            "base_url": base_url,
+            "examples": examples,
+            "warning": warning,
+            "models": [m["name"] for m in OllamaApi.models()],
         }
 
     async def update_all(self) -> dict:

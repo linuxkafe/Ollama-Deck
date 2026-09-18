@@ -90,6 +90,10 @@ const setService = callable("set_service");
 const setAutostart = callable("set_autostart");
 const setKeepAwake = callable("set_keep_awake");
 const updateAll = callable("update_all");
+const pullModel = callable("pull_model");
+const deleteModel = callable("delete_model");
+const chat = callable("chat");
+const lanInfo = callable("lan_info");
 function formatSize(size) {
     const units = ["B", "KB", "MB", "GB", "TB"];
     let value = size;
@@ -115,6 +119,15 @@ function StatusDot({ ok }) {
 function Content() {
     const [status, setStatus] = SP_REACT.useState(null);
     const [busy, setBusy] = SP_REACT.useState(false);
+    const [pullModalOpen, setPullModalOpen] = SP_REACT.useState(false);
+    const [pullModelName, setPullModelName] = SP_REACT.useState("");
+    const [deleteConfirm, setDeleteConfirm] = SP_REACT.useState(null);
+    const [chatMessages, setChatMessages] = SP_REACT.useState([]);
+    const [chatInput, setChatInput] = SP_REACT.useState("");
+    const [chatModel, setChatModel] = SP_REACT.useState("");
+    const [chatBusy, setChatBusy] = SP_REACT.useState(false);
+    const [lanInfoData, setLanInfoData] = SP_REACT.useState(null);
+    const [lanInfoLoaded, setLanInfoLoaded] = SP_REACT.useState(false);
     const refresh = async () => {
         try {
             setStatus(await getStatus());
@@ -138,8 +151,139 @@ function Content() {
             await refresh();
         }
     };
+    const doPull = async () => {
+        if (!pullModelName.trim())
+            return;
+        const tag = pullModelName.trim();
+        setPullModalOpen(false);
+        setPullModelName("");
+        setBusy(true);
+        try {
+            const res = await pullModel(tag);
+            if (!res.ok) {
+                toaster.toast({
+                    title: "Pull falhou",
+                    body: res.error || `Não foi possível instalar ${tag}`,
+                    critical: true,
+                });
+            }
+            else {
+                toaster.toast({
+                    title: "Modelo instalado",
+                    body: tag,
+                });
+            }
+        }
+        catch (err) {
+            toaster.toast({
+                title: "Pull falhou",
+                body: String(err),
+                critical: true,
+            });
+        }
+        finally {
+            setBusy(false);
+            await refresh();
+        }
+    };
+    const doDelete = async (tag) => {
+        setDeleteConfirm(null);
+        setBusy(true);
+        try {
+            const res = await deleteModel(tag);
+            if (!res.ok) {
+                toaster.toast({
+                    title: "Remoção falhou",
+                    body: res.error || `Não foi possível remover ${tag}`,
+                    critical: true,
+                });
+            }
+            else {
+                toaster.toast({
+                    title: "Modelo removido",
+                    body: tag,
+                });
+            }
+        }
+        catch (err) {
+            toaster.toast({
+                title: "Remoção falhou",
+                body: String(err),
+                critical: true,
+            });
+        }
+        finally {
+            setBusy(false);
+            await refresh();
+        }
+    };
+    const loadLanInfo = async () => {
+        if (lanInfoLoaded)
+            return;
+        try {
+            const res = await lanInfo();
+            setLanInfoData(res);
+            setLanInfoLoaded(true);
+        }
+        catch (err) {
+            console.error("lan_info failed", err);
+        }
+    };
+    const doChat = async () => {
+        if (!chatInput.trim() || !chatModel)
+            return;
+        const prompt = chatInput.trim();
+        setChatInput("");
+        setChatBusy(true);
+        setChatMessages((prev) => [...prev, { role: "user", content: prompt }]);
+        try {
+            const res = await chat(chatModel, prompt);
+            if (!res.ok) {
+                toaster.toast({
+                    title: "Chat falhou",
+                    body: res.error || "Erro desconhecido",
+                    critical: true,
+                });
+                setChatMessages((prev) => [...prev, { role: "assistant", content: `Erro: ${res.error}` }]);
+            }
+            else {
+                setChatMessages((prev) => [...prev, { role: "assistant", content: res.response || "" }]);
+            }
+        }
+        catch (err) {
+            toaster.toast({
+                title: "Chat falhou",
+                body: String(err),
+                critical: true,
+            });
+            setChatMessages((prev) => [...prev, { role: "assistant", content: `Erro: ${err}` }]);
+        }
+        finally {
+            setChatBusy(false);
+        }
+    };
+    SP_REACT.useEffect(() => {
+        if (status?.service_active) {
+            loadLanInfo();
+            if (status.models.length > 0 && !chatModel) {
+                setChatModel(status.models[0].name);
+            }
+        }
+    }, [status?.service_active, status?.models]);
     if (!status) {
         return (SP_JSX.jsx(DFL.PanelSection, { title: "Ollama Deck", children: SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsx("div", { style: { color: "#8b8b8b", padding: "8px 0" }, children: "Loading\u2026" }) }) }));
+    }
+    // Pull model modal
+    if (pullModalOpen) {
+        return (SP_JSX.jsxs(DFL.PanelSection, { title: "Instalar modelo", children: [SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsx("div", { style: { color: "#8b8b8b", fontSize: "12px", marginBottom: "8px" }, children: "Nome do modelo (ex: llama3.2, mistral:7b, codellama:13b)" }) }), SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsx("input", { type: "text", value: pullModelName, onChange: (e) => setPullModelName(e.target.value), placeholder: "llama3.2", style: {
+                            width: "100%",
+                            padding: "8px",
+                            borderRadius: "4px",
+                            border: "1px solid #4a4a4a",
+                            background: "#1a1a1a",
+                            color: "#fafafa",
+                            fontSize: "14px",
+                        }, autoFocus: true, onKeyDown: (e) => e.key === "Enter" && doPull() }) }), SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsxs("div", { style: { display: "flex", gap: "8px", justifyContent: "flex-end" }, children: [SP_JSX.jsx(DFL.ButtonItem, { layout: "inline", onClick: () => setPullModalOpen(false), children: "Cancelar" }), SP_JSX.jsx(DFL.ButtonItem, { layout: "inline", onClick: doPull, disabled: busy || !pullModelName.trim(), children: "Instalar" })] }) })] }));
     }
     const doUpdate = async () => {
         setBusy(true);
@@ -192,13 +336,38 @@ function Content() {
                         ? "O serviço arranca com a sessão do utilizador."
                         : "O serviço arranca apenas por pedido.", checked: status.autostart, disabled: busy, onChange: (on) => run(() => setAutostart(on)) }) }), status.api_url && status.service_active ? (SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsxs("div", { style: { color: "#8b8b8b", fontSize: "12px" }, children: ["API: ", status.api_url] }) })) : null, SP_JSX.jsxs(DFL.PanelSection, { title: "Updates", children: [SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsxs(DFL.ButtonItem, { layout: "below", disabled: busy, onClick: doUpdate, description: status.service_active
                                 ? "Atualiza o binário e faz pull dos modelos instalados."
-                                : "Atualiza o binário; os modelos listados serão puxados.", children: [SP_JSX.jsx(FaDownload, { style: { marginRight: "8px", verticalAlign: "middle" } }), "Update Ollama & models"] }) }), SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsx("div", { style: { color: "#8b8b8b", fontSize: "12px" }, children: busy
+                                : "Atualiza o binário; os modelos listados serão puxados.", children: [SP_JSX.jsx(FaDownload, { style: { marginRight: "8px", verticalAlign: "middle" } }), "Update Ollama & models"] }) }), SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsxs(DFL.ButtonItem, { layout: "below", disabled: busy || !status.service_active, onClick: () => setPullModalOpen(true), description: "Instala um novo modelo (ex: llama3.2, mistral:7b). Requer servi\u00E7o ativo.", children: [SP_JSX.jsx(FaDownload, { style: { marginRight: "8px", verticalAlign: "middle" } }), "Instalar modelo"] }) }), SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsx("div", { style: { color: "#8b8b8b", fontSize: "12px" }, children: busy
                                 ? "A atualizar… a inferência fica em pausa."
-                                : `Versão atual: ${status.version ?? "—"}. Modelos: ${status.models.length}.` }) })] }), status.models.length > 0 ? (SP_JSX.jsx(DFL.PanelSection, { title: "Models", children: status.models.map((m) => (SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsxs("div", { style: {
-                            display: "flex",
-                            justifyContent: "space-between",
-                            color: "#e6e6e6"
-                        }, children: [SP_JSX.jsx("span", { children: m.name }), SP_JSX.jsxs("span", { style: { color: "#8b8b8b" }, children: [m.family, " \u00B7 ", formatSize(m.size)] })] }) }, m.name))) })) : (SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsx("div", { style: { color: "#8b8b8b", fontSize: "12px" }, children: "Nenhum modelo \u2014 liga o servi\u00E7o para listar." }) })), status.error ? (SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsx("div", { style: { color: "#f43f5e", fontSize: "12px" }, children: status.error }) })) : null] }));
+                                : `Versão atual: ${status.version ?? "—"}. Modelos: ${status.models.length}.` }) })] }), status.service_active && status.models.length > 0 ? (SP_JSX.jsxs(DFL.PanelSection, { title: "Chat", children: [SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsx("select", { value: chatModel, onChange: (e) => setChatModel(e.target.value), disabled: chatBusy, style: {
+                                width: "100%",
+                                padding: "8px",
+                                borderRadius: "4px",
+                                border: "1px solid #4a4a4a",
+                                background: "#1a1a1a",
+                                color: "#fafafa",
+                                fontSize: "14px",
+                            }, children: status.models.map((m) => (SP_JSX.jsx("option", { value: m.name, children: m.name }, m.name))) }) }), SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsxs("div", { style: {
+                                maxHeight: "200px",
+                                overflowY: "auto",
+                                marginBottom: "8px",
+                                padding: "8px",
+                                background: "#1a1a1a",
+                                borderRadius: "4px",
+                                border: "1px solid #4a4a4a",
+                            }, children: [chatMessages.map((msg, idx) => (SP_JSX.jsxs("div", { style: { marginBottom: "8px", padding: "8px", borderRadius: "4px", background: msg.role === "user" ? "#22c55e22" : "#22c55e11" }, children: [SP_JSX.jsx("div", { style: { fontSize: "11px", color: "#8b8b8b", marginBottom: "4px" }, children: msg.role === "user" ? "Você" : "Ollama" }), SP_JSX.jsx("div", { style: { color: "#fafafa", whiteSpace: "pre-wrap", wordBreak: "break-word" }, children: msg.content })] }, idx))), chatBusy && (SP_JSX.jsx("div", { style: { padding: "8px", color: "#22c55e" }, children: "\u22EE Ollama a pensar\u2026" }))] }) }), SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsxs("div", { style: { display: "flex", gap: "8px" }, children: [SP_JSX.jsx("input", { type: "text", value: chatInput, onChange: (e) => setChatInput(e.target.value), onKeyDown: (e) => e.key === "Enter" && !chatBusy && doChat(), placeholder: "Digite a sua pergunta\u2026", disabled: chatBusy || !chatModel, style: {
+                                        flex: 1,
+                                        padding: "8px",
+                                        borderRadius: "4px",
+                                        border: "1px solid #4a4a4a",
+                                        background: "#1a1a1a",
+                                        color: "#fafafa",
+                                        fontSize: "14px",
+                                    }, autoFocus: true }), SP_JSX.jsx(DFL.ButtonItem, { layout: "inline", onClick: doChat, disabled: chatBusy || !chatInput.trim() || !chatModel, children: "Enviar" })] }) })] })) : null, status.service_active ? (SP_JSX.jsxs(DFL.PanelSection, { title: "Conex\u00E3o LAN", children: [SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsx("div", { style: { color: "#8b8b8b", fontSize: "12px", marginBottom: "8px" }, children: "Informa\u00E7\u00E3o para ligar a partir de outros equipamentos na rede:" }) }), lanInfoData ? (SP_JSX.jsxs(SP_JSX.Fragment, { children: [lanInfoData.warning && (SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsx("div", { style: { color: "#f43f5e", fontSize: "11px", padding: "8px", background: "#f43f5e11", borderRadius: "4px", border: "1px solid #f43f5e33" }, children: lanInfoData.warning }) })), SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsxs("div", { style: { color: "#e6e6e6", fontSize: "12px" }, children: [SP_JSX.jsx("strong", { children: "Endere\u00E7o:" }), " ", lanInfoData.base_url] }) }), SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsxs("div", { style: { color: "#8b8b8b", fontSize: "11px", marginBottom: "8px" }, children: ["Modelos dispon\u00EDveis: ", lanInfoData.models?.join(", ") || "nenhum"] }) }), SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsx("div", { style: { color: "#8b8b8b", fontSize: "11px", marginBottom: "8px" }, children: "Exemplos de uso:" }) }), lanInfoData.examples && Object.entries(lanInfoData.examples).map(([lang, cmd]) => (SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsxs("div", { style: { display: "flex", gap: "8px", alignItems: "center" }, children: [SP_JSX.jsx("code", { style: { flex: 1, fontSize: "10px", background: "#1a1a1a", padding: "4px 8px", borderRadius: "4px", color: "#22c55e", whiteSpace: "pre-wrap", wordBreak: "break-all" }, children: cmd }), SP_JSX.jsx(DFL.ButtonItem, { layout: "inline", onClick: () => navigator.clipboard.writeText(cmd), disabled: busy, children: "Copiar" })] }) }, lang)))] })) : (SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsx("div", { style: { color: "#8b8b8b", fontSize: "12px" }, children: "A carregar informa\u00E7\u00E3o LAN\u2026" }) }))] })) : null, status.models.length > 0 ? (SP_JSX.jsx(DFL.PanelSection, { title: "Models", children: status.models.map((m) => (SP_JSX.jsxs(DFL.PanelSectionRow, { children: [SP_JSX.jsxs("div", { style: {
+                                display: "flex",
+                                justifyContent: "space-between",
+                                alignItems: "center",
+                                color: "#e6e6e6"
+                            }, children: [SP_JSX.jsx("span", { children: m.name }), SP_JSX.jsxs("div", { style: { display: "flex", alignItems: "center", gap: "8px" }, children: [SP_JSX.jsxs("span", { style: { color: "#8b8b8b" }, children: [m.family, " \u00B7 ", formatSize(m.size)] }), SP_JSX.jsx(DFL.ButtonItem, { layout: "inline", disabled: busy || deleteConfirm === m.name, onClick: () => setDeleteConfirm(m.name), description: "Remove este modelo permanentemente", children: "\uD83D\uDDD1" })] })] }), deleteConfirm === m.name && (SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsxs("div", { style: { display: "flex", gap: "8px", justifyContent: "flex-end" }, children: [SP_JSX.jsx(DFL.ButtonItem, { layout: "inline", onClick: () => setDeleteConfirm(null), children: "Cancelar" }), SP_JSX.jsx(DFL.ButtonItem, { layout: "inline", onClick: () => doDelete(m.name), children: "Confirmar remo\u00E7\u00E3o" })] }) }))] }, m.name))) })) : (SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsx("div", { style: { color: "#8b8b8b", fontSize: "12px" }, children: "Nenhum modelo \u2014 liga o servi\u00E7o para listar." }) })), status.error ? (SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsx("div", { style: { color: "#f43f5e", fontSize: "12px" }, children: status.error }) })) : null] }));
 }
 var index = definePlugin(() => ({
     name: "Ollama Deck",

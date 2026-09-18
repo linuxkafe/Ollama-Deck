@@ -8,6 +8,8 @@ utilizador, mas:
 2. Durante inferências longas (ou acesso remoto) o Deck pode suspender e
    interromper o servidor a meio.
 3. Não existe visibilidade do estado do servidor (versão, modelos, endereço).
+4. Não há forma de interagir com o Ollama diretamente no Gaming Mode.
+5. Não há instruções claras para ligar ao Ollama a partir de outros equipamentos na LAN.
 
 ## Solução
 Um plugin Decky — **Ollama-Deck** — que fornece:
@@ -16,15 +18,20 @@ Um plugin Decky — **Ollama-Deck** — que fornece:
   está a servir (systemd-inhibit).
 - Painel de estado: serviço ativo, auto-start, versão, URL da API,
   reachability e lista de modelos instalados.
+- **Chat com Ollama** diretamente no overlay do Decky (Gaming Mode), com
+  seleção de modelo e histórico da sessão.
+- **Info de conexão LAN** — endereço, porta, modelos disponíveis e exemplos
+  de uso (curl, Python, JavaScript) para ligar a partir de outros equipamentos.
 
 ## Value Proposition
 O utilizador liga o Ollama pelo menu rápido do Steam (Quick Access), mantém o
-Deck acordado durante inferências, e sabe — à distância de um olhar — se o
-servidor está disponível e com que modelos, em qualquer interface (gamemode
-ou desktop), sem tocar numa shell.
+Deck acordado durante inferências, conversa com o modelo diretamente no overlay
+do Gaming Mode, e sabe — à distância de um olhar — como ligar ao servidor a
+partir de qualquer equipamento na rede local, sem tocar numa shell.
 
 ## Non-goals (fase atual)
-- Gestão de modelos (pull/delete/quantização).
 - Web UI embutida.
 - Atualização automática do binário Ollama.
 - Suporte root-only (o plugin funciona sem privilégios).
+- Seleção de quantização / busca de modelos (apenas pull/rm por nome).
+- Histórico de chat persistente entre reboots (apenas sessão atual).
