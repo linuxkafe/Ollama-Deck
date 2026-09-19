@@ -119,6 +119,30 @@ const translations: Record<string, Translations> = {
     'update.body.models': '{ok}/{total} models',
     'update.body.models.none': 'no models to update',
     'update.body.failed': 'failed: {models}',
+
+    'network.label': 'Expose on LAN',
+    'network.desc': 'Allow connections from other devices on the network (binds to 0.0.0.0).',
+
+    'chat.web_search': 'Web Search',
+    'chat.web_search.desc': 'Enable web search as RAG source for this chat.',
+
+    'persona.title': 'Persona',
+    'persona.desc': 'Configure the AI persona (system prompt, creativity, length).',
+    'persona.name.placeholder': 'Persona name',
+    'persona.system_prompt.placeholder': 'System prompt (instructions for the AI)',
+    'persona.temperature': 'Temperature',
+    'persona.max_tokens': 'Max Tokens',
+    'persona.model.default': 'Use selected model in chat',
+    'persona.btn.reset': 'Reset',
+    'persona.btn.save': 'Save Persona',
+
+    'toast.persona.saved': 'Persona saved',
+    'toast.persona.save_failed': 'Failed to save persona',
+
+    'plugins.title': 'Plugins & Personas',
+    'plugins.desc': 'Manage plugins and download personas (coming soon).',
+    'plugins.coming_soon': 'Plugin marketplace and persona downloads coming in future update.',
+    'plugins.persona_marketplace': 'Persona marketplace: browse and install community personas.',
   },
   pt: {
     'app.title': 'Ollama Deck',
@@ -233,11 +257,35 @@ const translations: Record<string, Translations> = {
     'toast.rag.install.error': 'Erro',
     'toast.error.unknown': 'Erro desconhecido',
 
+    'toast.persona.saved': 'Persona salva',
+    'toast.persona.save_failed': 'Falha ao salvar persona',
+
     'update.body.ollama': 'Ollama {before} -> {after}',
     'update.body.ollama.single': 'Ollama {after}',
     'update.body.models': '{ok}/{total} modelos',
     'update.body.models.none': 'sem modelos para atualizar',
     'update.body.failed': 'falhou: {models}',
+
+    'network.label': 'Expor na LAN',
+    'network.desc': 'Permitir conexões de outros equipamentos na rede (liga a 0.0.0.0).',
+
+    'chat.web_search': 'Pesquisa Web',
+    'chat.web_search.desc': 'Ativar pesquisa web como fonte RAG para este chat.',
+
+    'persona.title': 'Persona',
+    'persona.desc': 'Configurar a persona da IA (prompt de sistema, criatividade, comprimento).',
+    'persona.name.placeholder': 'Nome da persona',
+    'persona.system_prompt.placeholder': 'Prompt de sistema (instruções para a IA)',
+    'persona.temperature': 'Temperatura',
+    'persona.max_tokens': 'Tokens máximos',
+    'persona.model.default': 'Usar modelo selecionado no chat',
+    'persona.btn.reset': 'Repor',
+    'persona.btn.save': 'Salvar Persona',
+
+    'plugins.title': 'Plugins e Personas',
+    'plugins.desc': 'Gerir plugins e descarregar personas (em breve).',
+    'plugins.coming_soon': 'Marketplace de plugins e download de personas em atualização futura.',
+    'plugins.persona_marketplace': 'Marketplace de personas: navegar e instalar personas da comunidade.',
   },
 };
 

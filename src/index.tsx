@@ -98,6 +98,27 @@ type RagConfigResult = {
   error?: string;
 };
 
+type Persona = {
+  name: string;
+  system_prompt: string;
+  temperature: number;
+  max_tokens: number;
+  model: string;
+};
+
+type PersonaResult = {
+  ok: boolean;
+  persona?: Persona;
+  error?: string;
+};
+
+type NetworkExposureResult = {
+  ok: boolean;
+  expose?: boolean;
+  bind_address?: string;
+  error?: string;
+};
+
 const getStatus = callable<[], Status>("get_status");
 const setService = callable<[on: boolean], { ok: boolean }>("set_service");
 const setAutostart = callable<[on: boolean], { ok: boolean }>("set_autostart");
@@ -105,11 +126,22 @@ const setKeepAwake = callable<[on: boolean], { ok: boolean }>("set_keep_awake");
 const updateAll = callable<[], UpdateResult>("update_all");
 const pullModel = callable<[tag: string], { ok: boolean; error?: string }>("pull_model");
 const deleteModel = callable<[tag: string], { ok: boolean; error?: string }>("delete_model");
-const chat = callable<[model: string, prompt: string], ChatResult>("chat");
+const chat = callable<[model: string, prompt: string, use_web_search?: boolean, persona?: Persona], ChatResult>("chat");
 const lanInfo = callable<[], LanInfoResult>("lan_info");
 const searchModels = callable<[query?: string, tags?: string[]], SearchModelsResult>("search_models");
 const getRagConfig = callable<[], RagConfigResult>("get_rag_config");
 const setRagConfig = callable<[documents_dir?: string, embedding_model?: string], RagConfigResult>("set_rag_config");
+const setNetworkExposure = callable<[expose: boolean], NetworkExposureResult>("set_network_exposure");
+const getPersona = callable<[], PersonaResult>("get_persona");
+const setPersona = callable<[persona: Persona], PersonaResult>("set_persona");
+
+const DEFAULT_PERSONA: Persona = {
+  name: "Default",
+  system_prompt: "You are a helpful assistant.",
+  temperature: 0.7,
+  max_tokens: 2048,
+  model: "",
+};
 
 function formatSize(size: number): string {
   const units = ["B", "KB", "MB", "GB", "TB"];
@@ -155,17 +187,52 @@ function Content() {
   const [ragConfig, setRagConfigState] = useState<RagConfigResult | null>(null);
   const [ragDirInput, setRagDirInput] = useState("");
   const [ragModelInstalling, setRagModelInstalling] = useState(false);
+  const [networkExpose, setNetworkExpose] = useState(false);
+  const [webSearchEnabled] = useState(true);
+  const [persona, setPersonaState] = useState<Persona>(DEFAULT_PERSONA);
+  const [personaName, setPersonaName] = useState("");
+  const [personaSystemPrompt, setPersonaSystemPrompt] = useState("");
+  const [personaTemperature, setPersonaTemperature] = useState(0.7);
+  const [personaMaxTokens, setPersonaMaxTokens] = useState(2048);
+  const [personaModel, setPersonaModel] = useState("");
 
   const refresh = async () => {
     try {
       setStatus(await getStatus());
+      const personaRes = await getPersona();
+      if (personaRes.ok && personaRes.persona) {
+        setPersonaState(personaRes.persona);
+      }
     } catch (err) {
       console.error("get_status failed", err);
     }
   };
 
+  const loadPersona = async () => {
+    try {
+      const res = await getPersona();
+      if (res.ok && res.persona) {
+        setPersonaState(res.persona);
+      }
+    } catch (err) {
+      console.error("get_persona failed", err);
+    }
+  };
+
+  const loadNetworkExpose = async () => {
+    try {
+      const res = await getStatus();
+      const host = res.api_url?.includes("0.0.0.0") || res.api_url?.includes("LAN");
+      setNetworkExpose(!!host);
+    } catch (err) {
+      console.error("load_network_expose failed", err);
+    }
+  };
+
   useEffect(() => {
     refresh();
+    loadPersona();
+    loadNetworkExpose();
     const iv = setInterval(refresh, 5000);
     return () => clearInterval(iv);
   }, []);
@@ -258,6 +325,8 @@ function Content() {
       <ChatModal
         models={status.models}
         initialModel={chatModel || status.models[0].name}
+        initialPersona={persona}
+        initialWebSearch={webSearchEnabled}
       />,
       undefined,
       {
@@ -395,6 +464,44 @@ function Content() {
     }
   };
 
+  const doUpdate = async () => {
+    setBusy(true);
+    let res: UpdateResult | undefined;
+    try {
+      res = await updateAll();
+      const o = res.ollama;
+      const ollamaBody =
+        o.before && o.after && o.before !== o.after
+          ? t('update.body.ollama', { before: o.before, after: o.after })
+          : t('update.body.ollama.single', { after: o.after ?? '?' });
+      const okModels = res.models.filter((m) => m.ok).length;
+      const failed = res.models.filter((m) => !m.ok);
+      const modelSummary = res.models.length
+        ? t('update.body.models', { ok: okModels, total: res.models.length })
+        : t('update.body.models.none');
+      toaster.toast({
+        title: res.ok ? t('toast.update.complete') : t('toast.update.partial'),
+        body:
+          `${ollamaBody} · ${modelSummary}` +
+          (failed.length
+            ? ` · ${t('update.body.failed', { models: failed.map((m) => m.model).join(", ") })}`
+            : ""),
+        critical: !res.ok,
+        duration: 8000
+      });
+    } catch (err) {
+      console.error("update_all failed", err);
+      toaster.toast({
+        title: t('toast.update.failed'),
+        body: String(err),
+        critical: true
+      });
+    } finally {
+      setBusy(false);
+      await refresh();
+    }
+  };
+
   if (!status) {
     return (
       <PanelSection title={t('app.title')}>
@@ -405,7 +512,6 @@ function Content() {
     );
   }
 
-  // Pull model modal
   if (pullModalOpen) {
     return (
       <PanelSection title={t('pull.modal.title')}>
@@ -453,44 +559,6 @@ function Content() {
       </PanelSection>
     );
   }
-
-  const doUpdate = async () => {
-    setBusy(true);
-    let res: UpdateResult | undefined;
-    try {
-      res = await updateAll();
-      const o = res.ollama;
-      const ollamaBody =
-        o.before && o.after && o.before !== o.after
-          ? t('update.body.ollama', { before: o.before, after: o.after })
-          : t('update.body.ollama.single', { after: o.after ?? '?' });
-      const okModels = res.models.filter((m) => m.ok).length;
-      const failed = res.models.filter((m) => !m.ok);
-      const modelSummary = res.models.length
-        ? t('update.body.models', { ok: okModels, total: res.models.length })
-        : t('update.body.models.none');
-      toaster.toast({
-        title: res.ok ? t('toast.update.complete') : t('toast.update.partial'),
-        body:
-          `${ollamaBody} · ${modelSummary}` +
-          (failed.length
-            ? ` · ${t('update.body.failed', { models: failed.map((m) => m.model).join(", ") })}`
-            : ""),
-        critical: !res.ok,
-        duration: 8000
-      });
-    } catch (err) {
-      console.error("update_all failed", err);
-      toaster.toast({
-        title: t('toast.update.failed'),
-        body: String(err),
-        critical: true
-      });
-    } finally {
-      setBusy(false);
-      await refresh();
-    }
-  };
 
   return (
     <PanelSection title={t('app.title')}>
@@ -557,6 +625,16 @@ function Content() {
           checked={status.autostart}
           disabled={busy}
           onChange={(on) => run(() => setAutostart(on))}
+        />
+      </PanelSectionRow>
+
+      <PanelSectionRow>
+        <ToggleField
+          label={t('network.label')}
+          description={t('network.desc')}
+          checked={networkExpose}
+          disabled={busy || !status.service_active}
+          onChange={(on) => run(() => setNetworkExposure(on))}
         />
       </PanelSectionRow>
 
@@ -948,21 +1026,188 @@ function Content() {
           )}
         </PanelSection>
       )}
+
+      {status.service_active && (
+        <PanelSection title={t('persona.title')}>
+          <PanelSectionRow>
+            <div style={{ color: "#8b8b8b", fontSize: "12px", marginBottom: "8px" }}>
+              {t('persona.desc')}
+            </div>
+          </PanelSectionRow>
+          <PanelSectionRow>
+            <input
+              type="text"
+              value={personaName || persona.name}
+              onChange={(e) => setPersonaName(e.target.value)}
+              placeholder={t('persona.name.placeholder')}
+              style={{
+                width: "100%",
+                padding: "8px",
+                borderRadius: "4px",
+                border: "1px solid #4a4a4a",
+                background: "#1a1a1a",
+                color: "#fafafa",
+                fontSize: "14px",
+                marginBottom: "8px",
+              }}
+            />
+          </PanelSectionRow>
+          <PanelSectionRow>
+            <textarea
+              value={personaSystemPrompt || persona.system_prompt}
+              onChange={(e) => setPersonaSystemPrompt(e.target.value)}
+              placeholder={t('persona.system_prompt.placeholder')}
+              rows={4}
+              style={{
+                width: "100%",
+                padding: "8px",
+                borderRadius: "4px",
+                border: "1px solid #4a4a4a",
+                background: "#1a1a1a",
+                color: "#fafafa",
+                fontSize: "14px",
+                marginBottom: "8px",
+                resize: "vertical",
+              }}
+            />
+          </PanelSectionRow>
+          <PanelSectionRow>
+            <div style={{ display: "flex", gap: "12px", flexWrap: "wrap", marginBottom: "8px" }}>
+              <div style={{ flex: 1, minWidth: "150px" }}>
+                <label style={{ display: "block", color: "#8b8b8b", fontSize: "12px", marginBottom: "4px" }}>
+                  {t('persona.temperature')} ({personaTemperature.toFixed(1)})
+                </label>
+                <input
+                  type="range"
+                  min="0"
+                  max="2"
+                  step="0.1"
+                  value={personaTemperature}
+                  onChange={(e) => setPersonaTemperature(parseFloat(e.target.value))}
+                  style={{ width: "100%", accentColor: "#22c55e" }}
+                />
+              </div>
+              <div style={{ flex: 1, minWidth: "150px" }}>
+                <label style={{ display: "block", color: "#8b8b8b", fontSize: "12px", marginBottom: "4px" }}>
+                  {t('persona.max_tokens')} ({personaMaxTokens})
+                </label>
+                <input
+                  type="range"
+                  min="1"
+                  max="8192"
+                  step="1"
+                  value={personaMaxTokens}
+                  onChange={(e) => setPersonaMaxTokens(parseInt(e.target.value))}
+                  style={{ width: "100%", accentColor: "#22c55e" }}
+                />
+              </div>
+            </div>
+          </PanelSectionRow>
+          <PanelSectionRow>
+            <select
+              value={personaModel || persona.model}
+              onChange={(e) => setPersonaModel(e.target.value)}
+              style={{
+                width: "100%",
+                padding: "8px",
+                borderRadius: "4px",
+                border: "1px solid #4a4a4a",
+                background: "#1a1a1a",
+                color: "#fafafa",
+                fontSize: "14px",
+                marginBottom: "8px",
+              }}
+            >
+              <option value="">{t('persona.model.default')}</option>
+              {status?.models.map((m) => (
+                <option key={m.name} value={m.name}>
+                  {m.name}
+                </option>
+              ))}
+            </select>
+          </PanelSectionRow>
+          <PanelSectionRow>
+            <div style={{ display: "flex", gap: "8px", justifyContent: "flex-end" }}>
+              <ButtonItem
+                layout="inline"
+                onClick={() => {
+                  setPersonaName(persona.name);
+                  setPersonaSystemPrompt(persona.system_prompt);
+                  setPersonaTemperature(persona.temperature);
+                  setPersonaMaxTokens(persona.max_tokens);
+                  setPersonaModel(persona.model);
+                }}
+              >
+                {t('persona.btn.reset')}
+              </ButtonItem>
+              <ButtonItem
+                layout="inline"
+                onClick={async () => {
+                  const p = {
+                    name: personaName || persona.name,
+                    system_prompt: personaSystemPrompt || persona.system_prompt,
+                    temperature: personaTemperature,
+                    max_tokens: personaMaxTokens,
+                    model: personaModel || persona.model,
+                  };
+                  const res = await setPersona(p);
+                  if (res.ok) {
+                    setPersonaState(p);
+                    toaster.toast({ title: t('toast.persona.saved'), body: p.name });
+                  } else {
+                    toaster.toast({ title: t('toast.persona.save_failed'), body: res.error || "", critical: true });
+                  }
+                }}
+                disabled={busy}
+              >
+                {t('persona.btn.save')}
+              </ButtonItem>
+            </div>
+          </PanelSectionRow>
+        </PanelSection>
+      )}
+
+      {status.service_active && (
+        <PanelSection title={t('plugins.title')}>
+          <PanelSectionRow>
+            <div style={{ color: "#8b8b8b", fontSize: "12px", marginBottom: "8px" }}>
+              {t('plugins.desc')}
+            </div>
+          </PanelSectionRow>
+          <PanelSectionRow>
+            <div style={{ color: "#8b8b8b", fontSize: "12px", marginBottom: "8px" }}>
+              {t('plugins.coming_soon')}
+            </div>
+          </PanelSectionRow>
+          <PanelSectionRow>
+            <div style={{ color: "#8b8b8b", fontSize: "11px" }}>
+              {t('plugins.persona_marketplace')}
+            </div>
+          </PanelSectionRow>
+        </PanelSection>
+      )}
+
     </PanelSection>
   );
 }
- 
+
 function ChatModal({
   models,
-  initialModel
+  initialModel,
+  initialPersona,
+  initialWebSearch
 }: {
   models: ModelInfo[];
   initialModel: string;
+  initialPersona: Persona;
+  initialWebSearch: boolean;
 }) {
   const [chatMessages, setChatMessages] = useState<ChatMessage[]>([]);
   const [chatInput, setChatInput] = useState("");
   const [chatModel, setChatModel] = useState(initialModel);
   const [chatBusy, setChatBusy] = useState(false);
+  const [webSearchEnabled, setWebSearchEnabled] = useState(initialWebSearch);
+  const [currentPersona] = useState<Persona>(initialPersona);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   const scrollToBottom = () => {
@@ -980,7 +1225,7 @@ function ChatModal({
     setChatBusy(true);
     setChatMessages((prev) => [...prev, { role: "user", content: prompt }]);
     try {
-      const res = await chat(chatModel, prompt);
+      const res = await chat(chatModel, prompt, webSearchEnabled, currentPersona);
       if (!res.ok) {
         toaster.toast({
           title: t('chat.error.failed'),
@@ -1006,26 +1251,39 @@ function ChatModal({
   return (
     <div style={{ display: "flex", flexDirection: "column", height: "100%", minHeight: "500px" }}>
       <div style={{ padding: "12px 16px", borderBottom: "1px solid #4a4a4a", background: "#1a1a1a" }}>
-        <select
-          value={chatModel}
-          onChange={(e) => setChatModel(e.target.value)}
-          disabled={chatBusy}
-          style={{
-            width: "100%",
-            padding: "10px",
-            borderRadius: "6px",
-            border: "1px solid #4a4a4a",
-            background: "#1a1a1a",
-            color: "#fafafa",
-            fontSize: "16px",
-          }}
-        >
-          {models.map((m) => (
-            <option key={m.name} value={m.name}>
-              {m.name}
-            </option>
-          ))}
-        </select>
+        <div style={{ display: "flex", gap: "12px", alignItems: "center", flexWrap: "wrap" }}>
+          <select
+            value={chatModel}
+            onChange={(e) => setChatModel(e.target.value)}
+            disabled={chatBusy}
+            style={{
+              flex: 1,
+              minWidth: "200px",
+              padding: "10px",
+              borderRadius: "6px",
+              border: "1px solid #4a4a4a",
+              background: "#1a1a1a",
+              color: "#fafafa",
+              fontSize: "16px",
+            }}
+          >
+            {models.map((m) => (
+              <option key={m.name} value={m.name}>
+                {m.name}
+              </option>
+            ))}
+          </select>
+          <label style={{ display: "flex", alignItems: "center", gap: "8px", color: "#fafafa", fontSize: "14px", cursor: "pointer" }}>
+            <input
+              type="checkbox"
+              checked={webSearchEnabled}
+              onChange={(e) => setWebSearchEnabled(e.target.checked)}
+              disabled={chatBusy}
+              style={{ width: "18px", height: "18px", accentColor: "#22c55e" }}
+            />
+            {t('chat.web_search')}
+          </label>
+        </div>
       </div>
       <div
         style={{

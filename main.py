@@ -5,6 +5,7 @@ import re
 import shlex
 import subprocess
 import urllib.request
+import urllib.parse
 from typing import Any, Optional
 
 try:
@@ -249,6 +250,41 @@ class Settings:
         self.save()
 
 
+DEFAULT_PERSONA = {
+    "name": "Default",
+    "system_prompt": "You are a helpful assistant.",
+    "temperature": 0.7,
+    "max_tokens": 2048,
+    "model": "",
+}
+
+
+def _validate_persona(persona: dict) -> tuple[bool, str]:
+    required = ("name", "system_prompt", "temperature", "max_tokens", "model")
+    for field in required:
+        if field not in persona:
+            return False, f"Missing field: {field}"
+    if not isinstance(persona["name"], str) or not persona["name"].strip():
+        return False, "Name must be non-empty string"
+    if not isinstance(persona["system_prompt"], str):
+        return False, "System prompt must be string"
+    try:
+        temp = float(persona["temperature"])
+        if not (0.0 <= temp <= 2.0):
+            return False, "Temperature must be 0.0-2.0"
+    except (ValueError, TypeError):
+        return False, "Temperature must be a number"
+    try:
+        tokens = int(persona["max_tokens"])
+        if not (1 <= tokens <= 8192):
+            return False, "Max tokens must be 1-8192"
+    except (ValueError, TypeError):
+        return False, "Max tokens must be an integer"
+    if not isinstance(persona["model"], str):
+        return False, "Model must be string"
+    return True, ""
+
+
 class Systemctl:
     @staticmethod
     async def run(*args: str) -> tuple[int, str, str]:
@@ -333,6 +369,30 @@ class OllamaApi:
             )
         out.sort(key=lambda m: m["size"])
         return out
+
+    @staticmethod
+    def web_search(query: str, max_results: int = 5) -> list[dict]:
+        """Search the web using DuckDuckGo HTML scrape. Returns list of {title, url, snippet}."""
+        try:
+            url = f"https://html.duckduckgo.com/html/?q={urllib.parse.quote(query)}"
+            req = urllib.request.Request(
+                url,
+                headers={"User-Agent": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36"},
+            )
+            with urllib.request.urlopen(req, timeout=10) as resp:
+                html = resp.read().decode()
+            results = []
+            for match in re.finditer(r'class="result__title">\s*<a[^>]*href="([^"]*)"[^>]*>([^<]*)</a>.*?class="result__snippet">([^<]*)', html, re.DOTALL):
+                link, title, snippet = match.groups()
+                if link.startswith("//"):
+                    link = "https:" + link
+                results.append({"title": title.strip(), "url": link, "snippet": snippet.strip()[:300]})
+                if len(results) >= max_results:
+                    break
+            return results
+        except (OSError, ValueError, re.error) as e:
+            log(f"Web search failed: {e}")
+            return []
 
 
 class Inhibitor:
@@ -500,18 +560,6 @@ class Plugin:
     async def delete_model(self, tag: str) -> dict:
         return await self._delete(tag)
 
-    async def chat(self, model: str, prompt: str) -> dict:
-        if not await Systemctl.is_active():
-            return _fault("Ollama service is not running")
-        models = OllamaApi.models()
-        model_names = [m["name"] for m in models]
-        if model not in model_names:
-            return _fault(f"Model '{model}' not found. Available: {', '.join(model_names) or 'none'}")
-        response = OllamaApi.chat(model, prompt)
-        if response is None:
-            return _fault("Failed to get response from Ollama")
-        return {"ok": True, "response": response, "model": model}
-
     async def lan_info(self) -> dict:
         host = read_host()
         ip = lan_ip()
@@ -629,3 +677,98 @@ class Plugin:
                 + ("" if bin_ok else " e update do binário")
             ),
         }
+
+    async def set_network_exposure(self, expose: bool) -> dict:
+        """Set OLLAMA_HOST to 0.0.0.0 (expose) or 127.0.0.1 (local only)."""
+        host = "0.0.0.0" if expose else "127.0.0.1"
+        try:
+            with open(UNIT_PATH, "r", encoding="utf-8") as fh:
+                text = fh.read()
+            if "OLLAMA_HOST=" in text:
+                text = re.sub(r"OLLAMA_HOST=\S+", f"OLLAMA_HOST={host}", text)
+            else:
+                text = text.replace(
+                    'Environment="OLLAMA_VULKAN=1"',
+                    f'Environment="OLLAMA_HOST={host}"\nEnvironment="OLLAMA_VULKAN=1"',
+                )
+            with open(UNIT_PATH, "w", encoding="utf-8") as fh:
+                fh.write(text)
+            await Systemctl.run("daemon-reload")
+            was_active = await Systemctl.is_active()
+            if was_active:
+                await Systemctl.run("restart", SERVICE)
+            await self._sync()
+            return {"ok": True, "expose": expose, "bind_address": host}
+        except OSError as e:
+            return _fault(f"Failed to update unit file: {e}")
+
+    def _get_persona(self) -> dict:
+        persona = self.settings.get("persona")
+        if persona:
+            ok, _ = _validate_persona(persona)
+            if ok:
+                return persona
+        return DEFAULT_PERSONA.copy()
+
+    async def get_persona(self) -> dict:
+        return {"ok": True, "persona": self._get_persona()}
+
+    async def set_persona(self, persona: dict) -> dict:
+        ok, err = _validate_persona(persona)
+        if not ok:
+            return _fault(f"Invalid persona: {err}")
+        self.settings.set("persona", persona)
+        return await self.get_persona()
+
+    async def chat(self, model: str, prompt: str, use_web_search: bool = True, persona: dict | None = None) -> dict:
+        if not await Systemctl.is_active():
+            return _fault("Ollama service is not running")
+        models = OllamaApi.models()
+        model_names = [m["name"] for m in models]
+        if model not in model_names:
+            return _fault(f"Model '{model}' not found. Available: {', '.join(model_names) or 'none'}")
+        
+        active_persona = persona or self._get_persona()
+        system_prompt = active_persona.get("system_prompt", "")
+        temperature = active_persona.get("temperature", 0.7)
+        max_tokens = active_persona.get("max_tokens", 2048)
+        
+        full_prompt = prompt
+        if use_web_search:
+            search_results = OllamaApi.web_search(prompt)
+            if search_results:
+                context = "\n\n".join([f"Source: {r['title']} ({r['url']})\n{r['snippet']}" for r in search_results])
+                full_prompt = f"Web search results:\n{context}\n\nUser question: {prompt}"
+        
+        if system_prompt:
+            full_prompt = f"System: {system_prompt}\n\n{full_prompt}"
+        
+        payload = json.dumps({
+            "model": model,
+            "prompt": full_prompt,
+            "stream": False,
+            "options": {"temperature": temperature, "num_predict": max_tokens}
+        }).encode()
+        
+        req = urllib.request.Request(
+            API_BASE + "/api/generate",
+            data=payload,
+            headers={"Content-Type": "application/json"},
+            method="POST",
+        )
+        try:
+            with urllib.request.urlopen(req, timeout=120) as resp:
+                data = json.loads(resp.read().decode())
+            response = str(data.get("response", ""))
+            return {"ok": True, "response": response, "model": model}
+        except (OSError, ValueError) as e:
+            log(f"Ollama chat failed: {e}")
+            return _fault(f"Failed to get response from Ollama: {e}")
+
+    async def list_plugins(self) -> dict:
+        """List available plugins (placeholder for future marketplace)."""
+        return {"ok": True, "plugins": []}
+
+    async def download_persona(self, persona_id: str) -> dict:
+        """Download a persona from registry (placeholder)."""
+        return _fault("Persona download not yet implemented")

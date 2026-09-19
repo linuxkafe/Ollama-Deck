@@ -178,14 +178,36 @@ def test_chat_model_not_found(monkeypatch):
 
 def test_chat_success(monkeypatch):
     import asyncio
+    from unittest.mock import AsyncMock, patch
+    
     mock_is_active = AsyncMock(return_value=True)
     monkeypatch.setattr(main.Systemctl, "is_active", mock_is_active)
     monkeypatch.setattr(main.OllamaApi, "models", lambda: [{"name": "llama3.2", "size": 100, "family": "llama", "quant": ""}])
-    monkeypatch.setattr(main.OllamaApi, "chat", lambda m, p: "Hello there!")
+    monkeypatch.setattr(main.OllamaApi, "web_search", lambda q, max_results=5: [])
 
     plugin = main.Plugin()
     plugin.settings = main.Settings()
     plugin.settings.data = {}
+
+    # Mock the urllib.request.urlopen to return a successful response
+    import urllib.request
+    original_urlopen = urllib.request.urlopen
+    
+    class MockResponse:
+        def read(self):
+            return b'{"response": "Hello there!"}'
+        def decode(self):
+            return '{"response": "Hello there!"}'
+        def __enter__(self):
+            return self
+        def __exit__(self, *args):
+            pass
+    
+    def mock_urlopen(req, timeout=120):
+        return MockResponse()
+    
+    monkeypatch.setattr(urllib.request, "urlopen", mock_urlopen)
+
     res = asyncio.run(plugin.chat("llama3.2", "hello"))
 
     assert res["ok"] is True
