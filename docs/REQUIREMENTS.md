@@ -15,6 +15,13 @@
 | FR-9 | Persistência do toggle keep-awake entre reloads (`settings.json`). | Ficheiro criado em `DECKY_PLUGIN_SETTINGS_DIR`. |
 | FR-10 | Botão "Instalar modelo" abre modal para pull de novo modelo (ex: llama3.2). Requer serviço ativo. | UI abre modal, chamada `pull_model`, toaster mostra resultado. |
 | FR-11 | Botão de remoção por modelo com confirmação — chama `delete_model` (`ollama rm`). | UI mostra confirmação, chamada `delete_model`, toaster mostra resultado. |
+| FR-12 | Painel "Biblioteca de Modelos" com pesquisa por nome/descrição e filtros por tags (chat, code, embedding, vision, tools). Lista resultados com botão "Instalar". | UI carrega resultados, `search_models` chamado, `pull_model` instalado. |
+| FR-13 | CLI `ollama-deck search <query> [--tag TAG]` lista modelos da biblioteca curada. | CLI devolve lista filtrada. |
+| FR-14 | CLI `ollama-deck install <model>` alias para `pull`. | Modelo instalado via `pull_model`. |
+| FR-15 | Painel "Configuração RAG" com input de diretório de documentos (persistido em settings). | `set_rag_config` guarda `rag_documents_dir`; `get_rag_config` lê. |
+| FR-16 | Deteção automática de modelos de embedding instalados; se nenhum, oferece instalar recomendado (embeddinggemma). | `get_rag_config` devolve `installed_embedding_models` e `recommended_embedding_model`; botão instala via `pull_model`. |
+| FR-17 | CLI `ollama-deck rag-dir [path] [--json]` define/consulta diretório RAG. | `set_rag_config`/`get_rag_config` chamado. |
+| FR-18 | CLI `ollama-deck rag-model [model] [--json]` define/consulta modelo de embedding. | `set_rag_config`/`get_rag_config` chamado. |
 
 ## Non-Functional Requirements
 

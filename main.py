@@ -28,6 +28,58 @@ OLLAMA_ARCH = {
     "arm64": "arm64",
 }.get(os.uname().machine or "")
 
+MODEL_LIBRARY = [
+    {"name": "llama3.2", "tags": ["chat"], "sizes": ["1b", "3b"], "description": "Meta's Llama 3.2 - fast, efficient"},
+    {"name": "llama3.1", "tags": ["chat"], "sizes": ["8b", "70b"], "description": "Meta's Llama 3.1 - strong general purpose"},
+    {"name": "mistral", "tags": ["chat"], "sizes": ["7b"], "description": "Mistral 7B - excellent quality/size ratio"},
+    {"name": "mistral-nemo", "tags": ["chat"], "sizes": ["12b"], "description": "Mistral NeMo 12B - multilingual"},
+    {"name": "gemma2", "tags": ["chat"], "sizes": ["2b", "9b", "27b"], "description": "Google Gemma 2 - open weights"},
+    {"name": "qwen2.5", "tags": ["chat"], "sizes": ["0.5b", "1.5b", "3b", "7b", "14b", "32b", "72b"], "description": "Alibaba Qwen 2.5 - strong multilingual"},
+    {"name": "phi3.5", "tags": ["chat"], "sizes": ["3.8b"], "description": "Microsoft Phi-3.5 - small but capable"},
+    {"name": "codellama", "tags": ["code"], "sizes": ["7b", "13b", "34b"], "description": "Meta Code Llama - code generation"},
+    {"name": "qwen2.5-coder", "tags": ["code"], "sizes": ["0.5b", "1.5b", "3b", "7b", "14b", "32b"], "description": "Qwen 2.5 Coder - strong code model"},
+    {"name": "deepseek-coder-v2", "tags": ["code"], "sizes": ["16b", "236b"], "description": "DeepSeek Coder V2 - advanced coding"},
+    {"name": "starcoder2", "tags": ["code"], "sizes": ["3b", "7b", "15b"], "description": "StarCoder2 - code completion"},
+    {"name": "embeddinggemma", "tags": ["embedding"], "sizes": ["300m"], "description": "Google EmbeddingGemma - recommended for RAG"},
+    {"name": "qwen3-embedding", "tags": ["embedding"], "sizes": ["4b", "8b"], "description": "Qwen3 Embedding - multilingual embeddings"},
+    {"name": "all-minilm", "tags": ["embedding"], "sizes": ["22m"], "description": "All-MiniLM - tiny, fast embeddings"},
+    {"name": "mxbai-embed-large", "tags": ["embedding"], "sizes": ["335m"], "description": "Mixedbread AI Embed Large - high quality"},
+    {"name": "nomic-embed-text", "tags": ["embedding"], "sizes": ["137m"], "description": "Nomic Embed Text - popular for RAG"},
+    {"name": "snowflake-arctic-embed", "tags": ["embedding"], "sizes": ["22m", "110m", "335m"], "description": "Snowflake Arctic Embed - efficient"},
+    {"name": "llava", "tags": ["vision"], "sizes": ["7b", "13b", "34b"], "description": "LLaVA - vision + language"},
+    {"name": "llava-phi3", "tags": ["vision"], "sizes": ["3.8b"], "description": "LLaVA-Phi3 - small vision model"},
+    {"name": "bakllava", "tags": ["vision"], "sizes": ["7b"], "description": "BakLLaVA - Mistral-based vision"},
+    {"name": "moondream", "tags": ["vision"], "sizes": ["2b"], "description": "Moondream - tiny vision model"},
+    {"name": "nemotron3-ultra", "tags": ["chat", "tools"], "sizes": ["53b"], "description": "NVIDIA Nemotron 3 Ultra - tool calling"},
+    {"name": "command-r", "tags": ["chat", "tools"], "sizes": ["35b"], "description": "Cohere Command R - RAG optimized"},
+    {"name": "command-r-plus", "tags": ["chat", "tools"], "sizes": ["104b"], "description": "Cohere Command R+ - advanced RAG"},
+    {"name": "aya-expanse", "tags": ["chat"], "sizes": ["8b", "32b"], "description": "Cohere Aya Expanse - 23 languages"},
+    {"name": "granite3.1-dense", "tags": ["chat"], "sizes": ["2b", "8b"], "description": "IBM Granite 3.1 - enterprise focused"},
+    {"name": "olmo2", "tags": ["chat"], "sizes": ["7b", "13b"], "description": "AllenAI OLMo 2 - fully open"},
+    {"name": "dolphin3", "tags": ["chat"], "sizes": ["8b", "70b"], "description": "Dolphin 3 - uncensored chat"},
+    {"name": "openhermes", "tags": ["chat"], "sizes": ["7b", "13b"], "description": "OpenHermes - Hermes fine-tune"},
+    {"name": "zephyr", "tags": ["chat"], "sizes": ["7b"], "description": "Zephyr - aligned chat model"},
+    {"name": "yarn-llama2", "tags": ["chat"], "sizes": ["7b", "13b"], "description": "YaRN Llama2 - extended context"},
+    {"name": "stable-beluga", "tags": ["chat"], "sizes": ["7b", "13b", "70b"], "description": "Stable Beluga - Orca-style training"},
+    {"name": "wizardlm2", "tags": ["chat"], "sizes": ["7b", "8x22b"], "description": "WizardLM 2 - Microsoft evolved"},
+    {"name": "solar", "tags": ["chat"], "sizes": ["10.7b"], "description": "SOLAR - upstage LLM"},
+    {"name": "openchat", "tags": ["chat"], "sizes": ["7b", "8x7b"], "description": "OpenChat - open source chat"},
+    {"name": "neural-chat", "tags": ["chat"], "sizes": ["7b"], "description": "Intel Neural Chat - fine-tuned Mistral"},
+    {"name": "orca-mini", "tags": ["chat"], "sizes": ["3b", "7b", "13b"], "description": "Orca Mini - small efficient"},
+    {"name": "falcon", "tags": ["chat"], "sizes": ["7b", "40b"], "description": "Falcon - TII UAE model"},
+    {"name": "mpt", "tags": ["chat"], "sizes": ["7b", "30b"], "description": "MPT - MosaicML foundation"},
+    {"name": "redpajama", "tags": ["chat"], "sizes": ["3b", "7b"], "description": "RedPajama - open reproduction"},
+    {"name": "stablelm", "tags": ["chat"], "sizes": ["3b", "7b"], "description": "StableLM - Stability AI"},
+    {"name": "xwinlm", "tags": ["chat"], "sizes": ["7b", "13b", "70b"], "description": "XWin-LM - aligned LLM"},
+    {"name": "vicuna", "tags": ["chat"], "sizes": ["7b", "13b", "33b"], "description": "Vicuna - LLaMA fine-tune"},
+    {"name": "alpaca", "tags": ["chat"], "sizes": ["7b"], "description": "Alpaca - Stanford instruction-tuned"},
+    {"name": "orca2", "tags": ["chat"], "sizes": ["7b", "13b"], "description": "Orca 2 - Microsoft reasoning"},
+    {"name": "wizardcoder", "tags": ["code"], "sizes": ["7b", "13b", "34b"], "description": "WizardCoder - code fine-tune"},
+    {"name": "magicoder", "tags": ["code"], "sizes": ["7b"], "description": "Magicoder - code generation"},
+    {"name": "stable-code", "tags": ["code"], "sizes": ["3b"], "description": "Stable Code - Stability AI"},
+    {"name": "codegeex", "tags": ["code"], "sizes": ["6b"], "description": "CodeGeeX - multilingual code"},
+]
+
 UNIT_TEMPLATE = """[Unit]
 Description=Ollama Service (Vulkan RADV no Steam Deck)
 After=network.target
@@ -486,6 +538,62 @@ class Plugin:
             "warning": warning,
             "models": [m["name"] for m in OllamaApi.models()],
         }
+
+    def _filter_models(self, query: str = "", tags: list[str] | None = None) -> list[dict]:
+        """Filter MODEL_LIBRARY by query string and/or tags."""
+        tags = tags or []
+        q = query.lower().strip()
+        results = []
+        for m in MODEL_LIBRARY:
+            if q and q not in m["name"].lower() and q not in m["description"].lower():
+                continue
+            if tags and not any(t in m["tags"] for t in tags):
+                continue
+            results.append(m)
+        return results
+
+    async def search_models(self, query: str = "", tags: list[str] | None = None) -> dict:
+        """Search the curated model library."""
+        results = self._filter_models(query, tags)
+        return {"ok": True, "models": results, "total": len(results)}
+
+    def _get_installed_embedding_models(self) -> list[str]:
+        """Return names of installed models that have 'embedding' tag."""
+        installed = OllamaApi.models()
+        installed_names = {m["name"] for m in installed}
+        embedding_names = {m["name"] for m in MODEL_LIBRARY if "embedding" in m["tags"]}
+        return sorted(installed_names & embedding_names)
+
+    async def get_rag_config(self) -> dict:
+        """Get current RAG configuration."""
+        documents_dir = self.settings.get("rag_documents_dir", "")
+        embedding_model = self.settings.get("rag_embedding_model", "")
+        installed_embeddings = self._get_installed_embedding_models()
+        recommended = None
+        if not installed_embeddings:
+            for m in MODEL_LIBRARY:
+                if "embedding" in m["tags"]:
+                    recommended = m["name"]
+                    break
+        return {
+            "ok": True,
+            "rag_documents_dir": documents_dir,
+            "rag_embedding_model": embedding_model or None,
+            "installed_embedding_models": installed_embeddings,
+            "recommended_embedding_model": recommended,
+        }
+
+    async def set_rag_config(self, documents_dir: str | None = None, embedding_model: str | None = None) -> dict:
+        """Set RAG configuration."""
+        if documents_dir is not None:
+            expanded = os.path.expanduser(documents_dir)
+            os.makedirs(expanded, exist_ok=True)
+            self.settings.set("rag_documents_dir", expanded)
+        if embedding_model is not None:
+            if embedding_model and embedding_model not in [m["name"] for m in MODEL_LIBRARY if "embedding" in m["tags"]]:
+                return _fault(f"Model '{embedding_model}' is not a known embedding model")
+            self.settings.set("rag_embedding_model", embedding_model)
+        return await self.get_rag_config()
 
     async def update_all(self) -> dict:
         """Update the ollama binary, then pull the installed/config models."""

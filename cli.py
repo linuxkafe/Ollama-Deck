@@ -46,15 +46,8 @@ import main as backend  # noqa: E402
 
 
 def build_parser() -> argparse.ArgumentParser:
-    parent = argparse.ArgumentParser(add_help=False)
-    parent.add_argument(
-        "--json",
-        action="store_true",
-        help="saída JSON (apenas para o comando status)",
-    )
     parser = argparse.ArgumentParser(
         prog="ollama-deck",
-        parents=[parent],
         description=(
             "Controla o serviço Ollama no Steam Deck "
             "(mesmo backend do plugin Decky Ollama-Deck)."
@@ -63,30 +56,49 @@ def build_parser() -> argparse.ArgumentParser:
     sub = parser.add_subparsers(dest="command", required=True, metavar="COMANDO")
 
     def _on(name: str, aliases: tuple, help: str) -> None:
-        sub.add_parser(name, aliases=list(aliases), parents=[parent], help=help)
+        sub.add_parser(name, aliases=list(aliases), help=help)
 
     _on("on", ("start",), "liga o serviço Ollama")
     _on("off", ("stop",), "desliga o serviço Ollama")
-    _on("status", (), "mostra o estado atual")
+
+    status = sub.add_parser("status", help="mostra o estado atual")
+    status.add_argument("--json", action="store_true", help="saída JSON")
+
     _on("enable", (), "ativa auto-arranque com a sessão")
     _on("disable", (), "desativa auto-arranque")
 
-    awake = sub.add_parser("awake", parents=[parent], help="keep-deck-awake (bloqueia a suspensão)")
+    awake = sub.add_parser("awake", help="keep-deck-awake (bloqueia a suspensão)")
     awake.add_argument("action", nargs="?", choices=("on", "off"))
 
-    sub.add_parser("update", parents=[parent], help="atualiza o Ollama e os modelos instalados")
+    sub.add_parser("update", help="atualiza o Ollama e os modelos instalados")
 
-    pull = sub.add_parser("pull", parents=[parent], help="faz pull/atualiza um modelo")
+    pull = sub.add_parser("pull", help="faz pull/atualiza um modelo")
     pull.add_argument("model")
 
-    rm = sub.add_parser("rm", parents=[parent], help="remove um modelo instalado")
+    rm = sub.add_parser("rm", help="remove um modelo instalado")
     rm.add_argument("model")
 
-    chat = sub.add_parser("chat", parents=[parent], help="envia prompt ao Ollama")
+    chat = sub.add_parser("chat", help="envia prompt ao Ollama")
     chat.add_argument("prompt")
     chat.add_argument("--model", help="modelo a usar (default: primeiro disponível)")
 
-    lan_info = sub.add_parser("lan-info", parents=[parent], help="mostra como ligar ao Ollama pela LAN")
+    lan_info = sub.add_parser("lan-info", help="mostra como ligar ao Ollama pela LAN")
+    lan_info.add_argument("--json", action="store_true", help="saída JSON")
+
+    search = sub.add_parser("search", help="pesquisa modelos na biblioteca")
+    search.add_argument("query", nargs="?", default="")
+    search.add_argument("--tag", action="append", help="filtrar por tag (chat, code, embedding, vision, tools)")
+
+    install = sub.add_parser("install", help="instala um modelo (alias para pull)")
+    install.add_argument("model")
+
+    rag_dir = sub.add_parser("rag-dir", help="define/consulta diretório RAG")
+    rag_dir.add_argument("path", nargs="?")
+    rag_dir.add_argument("--json", action="store_true", help="saída JSON")
+
+    rag_model = sub.add_parser("rag-model", help="define/consulta modelo de embedding RAG")
+    rag_model.add_argument("model", nargs="?")
+    rag_model.add_argument("--json", action="store_true", help="saída JSON")
 
     return parser
 
@@ -221,6 +233,88 @@ async def cmd_lan_info(plugin, as_json: bool) -> int:
     return 0
 
 
+async def cmd_search(plugin, query: str, tags: list[str] | None) -> int:
+    res = await plugin.search_models(query, tags)
+    if not res.get("ok"):
+        print(f"erro: {res.get('error', 'desconhecido')}", file=sys.stderr)
+        return 1
+    models = res.get("models", [])
+    if not models:
+        print("Nenhum modelo encontrado")
+        return 0
+    for m in models:
+        tags_str = ", ".join(m.get("tags", []))
+        sizes_str = ", ".join(m.get("sizes", []))
+        print(f"{m['name']}  [{tags_str}]  ({sizes_str})  - {m['description']}")
+    return 0
+
+
+async def cmd_install(plugin, model: str) -> int:
+    res = await plugin.pull_model(model)
+    print(f"[{'ok' if res['ok'] else 'FALHOU'}] {model}: {res['detail'][:120]}")
+    return 0 if res["ok"] else 1
+
+
+async def cmd_rag_dir(plugin, path: str | None, as_json: bool) -> int:
+    if path is None:
+        res = await plugin.get_rag_config()
+        if not res.get("ok"):
+            print(f"erro: {res.get('error', 'desconhecido')}", file=sys.stderr)
+            return 1
+        if as_json:
+            import json as _json
+            print(_json.dumps(res, indent=2, default=str))
+            return 0
+        print(f"Diretório RAG: {res.get('rag_documents_dir') or 'não definido'}")
+        print(f"Modelo embedding: {res.get('rag_embedding_model') or 'não definido'}")
+        installed = res.get("installed_embedding_models", [])
+        if installed:
+            print(f"Embeddings instalados: {', '.join(installed)}")
+        recommended = res.get("recommended_embedding_model")
+        if recommended:
+            print(f"Recomendado: {recommended}")
+        return 0
+    else:
+        res = await plugin.set_rag_config(path, None)
+        if not res.get("ok"):
+            print(f"erro: {res.get('error', 'desconhecido')}", file=sys.stderr)
+            return 1
+        if as_json:
+            import json as _json
+            print(_json.dumps(res, indent=2, default=str))
+            return 0
+        print(f"Diretório RAG definido: {res.get('rag_documents_dir')}")
+        return 0
+
+
+async def cmd_rag_model(plugin, model: str | None, as_json: bool) -> int:
+    if model is None:
+        res = await plugin.get_rag_config()
+        if not res.get("ok"):
+            print(f"erro: {res.get('error', 'desconhecido')}", file=sys.stderr)
+            return 1
+        if as_json:
+            import json as _json
+            print(_json.dumps(res, indent=2, default=str))
+            return 0
+        print(f"Modelo embedding atual: {res.get('rag_embedding_model') or 'não definido'}")
+        installed = res.get("installed_embedding_models", [])
+        if installed:
+            print(f"Disponíveis: {', '.join(installed)}")
+        return 0
+    else:
+        res = await plugin.set_rag_config(None, model)
+        if not res.get("ok"):
+            print(f"erro: {res.get('error', 'desconhecido')}", file=sys.stderr)
+            return 1
+        if as_json:
+            import json as _json
+            print(_json.dumps(res, indent=2, default=str))
+            return 0
+        print(f"Modelo de embedding definido: {res.get('rag_embedding_model')}")
+        return 0
+
+
 async def dispatch(args, plugin) -> int:
     command = args.command
     if command in ("on", "start"):
@@ -239,12 +333,20 @@ async def dispatch(args, plugin) -> int:
         return await cmd_update(plugin)
     if command == "pull":
         return await cmd_pull(plugin, args.model)
+    if command == "install":
+        return await cmd_install(plugin, args.model)
     if command == "rm":
         return await cmd_rm(plugin, args.model)
     if command == "chat":
         return await cmd_chat(plugin, args.prompt, args.model)
     if command == "lan-info":
         return await cmd_lan_info(plugin, args.json)
+    if command == "search":
+        return await cmd_search(plugin, args.query, args.tag)
+    if command == "rag-dir":
+        return await cmd_rag_dir(plugin, args.path, args.json)
+    if command == "rag-model":
+        return await cmd_rag_model(plugin, args.model, args.json)
     print(f"erro: comando desconhecido: {command}", file=sys.stderr)
     return 2
 

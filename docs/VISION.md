@@ -22,12 +22,18 @@ Um plugin Decky — **Ollama-Deck** — que fornece:
   seleção de modelo e histórico da sessão.
 - **Info de conexão LAN** — endereço, porta, modelos disponíveis e exemplos
   de uso (curl, Python, JavaScript) para ligar a partir de outros equipamentos.
+- **Biblioteca de modelos** — pesquisa e instalação de modelos da biblioteca
+  Ollama com filtros por categoria (chat, code, embedding, vision, tools).
+- **Configuração RAG** — diretório de documentos configurável pelo utilizador
+  e detecção/instalação automática de modelos de embedding recomendados.
 
 ## Value Proposition
 O utilizador liga o Ollama pelo menu rápido do Steam (Quick Access), mantém o
 Deck acordado durante inferências, conversa com o modelo diretamente no overlay
-do Gaming Mode, e sabe — à distância de um olhar — como ligar ao servidor a
-partir de qualquer equipamento na rede local, sem tocar numa shell.
+do Gaming Mode, sabe — à distância de um olhar — como ligar ao servidor a
+partir de qualquer equipamento na rede local, **descobre e instala modelos**
+sem saber tags exatas, e **configura um diretório RAG** com modelo de embedding
+recomendado em um clique, sem tocar numa shell.
 
 ## Non-goals (fase atual)
 - Web UI embutida.

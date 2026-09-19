@@ -73,6 +73,29 @@ type LanInfoResult = {
   error?: string;
 };
 
+type LibraryModel = {
+  name: string;
+  tags: string[];
+  sizes: string[];
+  description: string;
+};
+
+type SearchModelsResult = {
+  ok: boolean;
+  models: LibraryModel[];
+  total: number;
+  error?: string;
+};
+
+type RagConfigResult = {
+  ok: boolean;
+  rag_documents_dir: string;
+  rag_embedding_model?: string;
+  installed_embedding_models: string[];
+  recommended_embedding_model?: string;
+  error?: string;
+};
+
 const getStatus = callable<[], Status>("get_status");
 const setService = callable<[on: boolean], { ok: boolean }>("set_service");
 const setAutostart = callable<[on: boolean], { ok: boolean }>("set_autostart");
@@ -82,6 +105,9 @@ const pullModel = callable<[tag: string], { ok: boolean; error?: string }>("pull
 const deleteModel = callable<[tag: string], { ok: boolean; error?: string }>("delete_model");
 const chat = callable<[model: string, prompt: string], ChatResult>("chat");
 const lanInfo = callable<[], LanInfoResult>("lan_info");
+const searchModels = callable<[query?: string, tags?: string[]], SearchModelsResult>("search_models");
+const getRagConfig = callable<[], RagConfigResult>("get_rag_config");
+const setRagConfig = callable<[documents_dir?: string, embedding_model?: string], RagConfigResult>("set_rag_config");
 
 function formatSize(size: number): string {
   const units = ["B", "KB", "MB", "GB", "TB"];
@@ -123,6 +149,13 @@ function Content() {
   const [chatBusy, setChatBusy] = useState(false);
   const [lanInfoData, setLanInfoData] = useState<LanInfoResult | null>(null);
   const [lanInfoLoaded, setLanInfoLoaded] = useState(false);
+  const [librarySearch, setLibrarySearch] = useState("");
+  const [libraryTags, setLibraryTags] = useState<string[]>([]);
+  const [libraryResults, setLibraryResults] = useState<LibraryModel[]>([]);
+  const [libraryLoading, setLibraryLoading] = useState(false);
+  const [ragConfig, setRagConfigState] = useState<RagConfigResult | null>(null);
+  const [ragDirInput, setRagDirInput] = useState("");
+  const [ragModelInstalling, setRagModelInstalling] = useState(false);
 
   const refresh = async () => {
     try {
@@ -256,8 +289,124 @@ function Content() {
       if (status.models.length > 0 && !chatModel) {
         setChatModel(status.models[0].name);
       }
+      loadLibrarySearch();
+      loadRagConfig();
     }
   }, [status?.service_active, status?.models]);
+
+  const loadLibrarySearch = async () => {
+    setLibraryLoading(true);
+    try {
+      const res = await searchModels(librarySearch, libraryTags.length > 0 ? libraryTags : undefined);
+      if (res.ok) {
+        setLibraryResults(res.models);
+      }
+    } catch (err) {
+      console.error("search_models failed", err);
+    } finally {
+      setLibraryLoading(false);
+    }
+  };
+
+  const loadRagConfig = async () => {
+    try {
+      const res = await getRagConfig();
+      if (res.ok) {
+        setRagConfigState(res);
+        setRagDirInput(res.rag_documents_dir || "");
+      }
+    } catch (err) {
+      console.error("get_rag_config failed", err);
+    }
+  };
+
+  const doLibraryInstall = async (modelName: string) => {
+    setBusy(true);
+    try {
+      const res = await pullModel(modelName);
+      if (!res.ok) {
+        toaster.toast({
+          title: "Instalação falhou",
+          body: res.error || `Não foi possível instalar ${modelName}`,
+          critical: true,
+        });
+      } else {
+        toaster.toast({
+          title: "Modelo instalado",
+          body: modelName,
+        });
+        await loadLibrarySearch();
+      }
+    } catch (err) {
+      toaster.toast({
+        title: "Instalação falhou",
+        body: String(err),
+        critical: true,
+      });
+    } finally {
+      setBusy(false);
+      await refresh();
+    }
+  };
+
+  const doRagDirSave = async () => {
+    setBusy(true);
+    try {
+      const res = await setRagConfig(ragDirInput.trim() || undefined, undefined);
+      if (!res.ok) {
+        toaster.toast({
+          title: "Falha ao salvar",
+          body: res.error || "Erro desconhecido",
+          critical: true,
+        });
+      } else {
+        toaster.toast({ title: "Diretório RAG salvo", body: res.rag_documents_dir });
+        setRagConfigState(res);
+      }
+    } catch (err) {
+      toaster.toast({ title: "Falha ao salvar", body: String(err), critical: true });
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const doRagModelInstall = async () => {
+    if (!ragConfig?.recommended_embedding_model) return;
+    setRagModelInstalling(true);
+    setBusy(true);
+    try {
+      const model = ragConfig.recommended_embedding_model;
+      const res = await pullModel(model);
+      if (!res.ok) {
+        toaster.toast({ title: "Instalação falhou", body: res.error || "Erro", critical: true });
+      } else {
+        toaster.toast({ title: "Modelo de embedding instalado", body: model });
+        await loadRagConfig();
+      }
+    } catch (err) {
+      toaster.toast({ title: "Instalação falhou", body: String(err), critical: true });
+    } finally {
+      setRagModelInstalling(false);
+      setBusy(false);
+    }
+  };
+
+  const doRagModelSet = async (model: string) => {
+    setBusy(true);
+    try {
+      const res = await setRagConfig(undefined, model);
+      if (!res.ok) {
+        toaster.toast({ title: "Falha ao definir", body: res.error || "Erro", critical: true });
+      } else {
+        toaster.toast({ title: "Modelo de embedding definido", body: model });
+        setRagConfigState(res);
+      }
+    } catch (err) {
+      toaster.toast({ title: "Falha ao definir", body: String(err), critical: true });
+    } finally {
+      setBusy(false);
+    }
+  };
 
   if (!status) {
     return (
@@ -662,6 +811,220 @@ function Content() {
           <div style={{ color: "#f43f5e", fontSize: "12px" }}>{status.error}</div>
         </PanelSectionRow>
       ) : null}
+
+      {status.service_active && (
+        <PanelSection title="Biblioteca de Modelos">
+          <PanelSectionRow>
+            <div style={{ color: "#8b8b8b", fontSize: "12px", marginBottom: "8px" }}>
+              Pesquisar e instalar modelos da biblioteca Ollama
+            </div>
+          </PanelSectionRow>
+          <PanelSectionRow>
+            <input
+              type="text"
+              value={librarySearch}
+              onChange={(e) => setLibrarySearch(e.target.value)}
+              placeholder="Pesquisar por nome ou descrição…"
+              style={{
+                width: "100%",
+                padding: "8px",
+                borderRadius: "4px",
+                border: "1px solid #4a4a4a",
+                background: "#1a1a1a",
+                color: "#fafafa",
+                fontSize: "14px",
+                marginBottom: "8px",
+              }}
+            />
+          </PanelSectionRow>
+          <PanelSectionRow>
+            <div style={{ display: "flex", gap: "4px", flexWrap: "wrap", marginBottom: "8px" }}>
+              {["all", "chat", "code", "embedding", "vision", "tools"].map((tag) => {
+                const isActive = tag === "all" ? libraryTags.length === 0 : libraryTags.includes(tag);
+                return (
+                  <button
+                    key={tag}
+                    onClick={() => {
+                      if (tag === "all") {
+                        setLibraryTags([]);
+                      } else if (libraryTags.includes(tag)) {
+                        setLibraryTags(libraryTags.filter((t) => t !== tag));
+                      } else {
+                        setLibraryTags([...libraryTags, tag]);
+                      }
+                    }}
+                    style={{
+                      padding: "4px 10px",
+                      borderRadius: "4px",
+                      border: isActive ? "1px solid #22c55e" : "1px solid #4a4a4a",
+                      background: isActive ? "#22c55e22" : "#1a1a1a",
+                      color: isActive ? "#22c55e" : "#e6e6e6",
+                      fontSize: "12px",
+                      cursor: "pointer",
+                    }}
+                  >
+                    {tag === "all" ? "Todos" : tag.charAt(0).toUpperCase() + tag.slice(1)}
+                  </button>
+                );
+              })}
+            </div>
+          </PanelSectionRow>
+          {libraryLoading ? (
+            <PanelSectionRow>
+              <div style={{ color: "#8b8b8b", fontSize: "12px", textAlign: "center", padding: "16px" }}>
+                A pesquisar…
+              </div>
+            </PanelSectionRow>
+          ) : (
+            <>
+              {libraryResults.length > 0 ? (
+                libraryResults.map((m) => (
+                  <PanelSectionRow key={m.name}>
+                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                      <div>
+                        <div style={{ color: "#e6e6e6", fontWeight: 500 }}>{m.name}</div>
+                        <div style={{ color: "#8b8b8b", fontSize: "11px" }}>
+                          {m.description}
+                        </div>
+                        <div style={{ display: "flex", gap: "4px", marginTop: "4px" }}>
+                          {m.tags.map((t) => (
+                            <span key={t} style={{ fontSize: "10px", padding: "2px 6px", background: "#22c55e22", borderRadius: "3px", color: "#22c55e" }}>
+                              {t}
+                            </span>
+                          ))}
+                        </div>
+                      </div>
+                      <ButtonItem
+                        layout="inline"
+                        onClick={() => doLibraryInstall(m.name)}
+                        disabled={busy}
+                        description={`Instalar ${m.name}`}
+                      >
+                        Instalar
+                      </ButtonItem>
+                    </div>
+                  </PanelSectionRow>
+                ))
+              ) : (
+                <PanelSectionRow>
+                  <div style={{ color: "#8b8b8b", fontSize: "12px", textAlign: "center", padding: "16px" }}>
+                    Nenhum modelo encontrado. Tente ajustar a pesquisa.
+                  </div>
+                </PanelSectionRow>
+              )}
+            </>
+          )}
+          <PanelSectionRow>
+            <div style={{ color: "#8b8b8b", fontSize: "11px", marginTop: "8px" }}>
+              Não encontrou? Use "Instalar modelo" acima para instalar por tag exata (ex: llama3.2:7b).
+            </div>
+          </PanelSectionRow>
+        </PanelSection>
+      )}
+
+      {status.service_active && (
+        <PanelSection title="Configuração RAG">
+          <PanelSectionRow>
+            <div style={{ color: "#8b8b8b", fontSize: "12px", marginBottom: "8px" }}>
+              Diretório de documentos para RAG (Retrieval-Augmented Generation)
+            </div>
+          </PanelSectionRow>
+          <PanelSectionRow>
+            <input
+              type="text"
+              value={ragDirInput}
+              onChange={(e) => setRagDirInput(e.target.value)}
+              placeholder="~/Documents/ollama-rag"
+              style={{
+                flex: 1,
+                padding: "8px",
+                borderRadius: "4px",
+                border: "1px solid #4a4a4a",
+                background: "#1a1a1a",
+                color: "#fafafa",
+                fontSize: "14px",
+              }}
+            />
+            <ButtonItem layout="inline" onClick={doRagDirSave} disabled={busy}>
+              Salvar
+            </ButtonItem>
+          </PanelSectionRow>
+          {ragConfig && (
+            <>
+              <PanelSectionRow>
+                <div style={{ color: "#8b8b8b", fontSize: "11px" }}>
+                  Diretório atual: {ragConfig.rag_documents_dir || "não definido"}
+                </div>
+              </PanelSectionRow>
+              <PanelSectionRow>
+                <div style={{ color: "#8b8b8b", fontSize: "12px", marginBottom: "8px", marginTop: "8px" }}>
+                  Modelo de Embedding
+                </div>
+              </PanelSectionRow>
+              {ragConfig.installed_embedding_models.length > 0 ? (
+                <>
+                  <PanelSectionRow>
+                    <div style={{ color: "#e6e6e6", fontSize: "12px", marginBottom: "4px" }}>
+                      Instalados: {ragConfig.installed_embedding_models.join(", ")}
+                    </div>
+                  </PanelSectionRow>
+                  {ragConfig.rag_embedding_model ? (
+                    <PanelSectionRow>
+                      <div style={{ display: "flex", gap: "8px", alignItems: "center" }}>
+                        <span style={{ color: "#e6e6e6" }}>Ativo: {ragConfig.rag_embedding_model}</span>
+                        {ragConfig.installed_embedding_models.filter((m) => m !== ragConfig.rag_embedding_model).map((m) => (
+                          <ButtonItem
+                            key={m}
+                            layout="inline"
+                            onClick={() => doRagModelSet(m)}
+                            disabled={busy}
+                          >
+                            Usar {m}
+                          </ButtonItem>
+                        ))}
+                      </div>
+                    </PanelSectionRow>
+                  ) : (
+                    <PanelSectionRow>
+                      <div style={{ display: "flex", gap: "8px" }}>
+                        {ragConfig.installed_embedding_models.map((m) => (
+                          <ButtonItem
+                            key={m}
+                            layout="inline"
+                            onClick={() => doRagModelSet(m)}
+                            disabled={busy}
+                          >
+                            Usar {m}
+                          </ButtonItem>
+                        ))}
+                      </div>
+                    </PanelSectionRow>
+                  )}
+                </>
+              ) : (
+                <>
+                  <PanelSectionRow>
+                    <div style={{ color: "#f43f5e", fontSize: "11px", padding: "8px", background: "#f43f5e11", borderRadius: "4px", border: "1px solid #f43f5e33" }}>
+                      Nenhum modelo de embedding instalado. RAG requer um modelo de embedding.
+                    </div>
+                  </PanelSectionRow>
+                  {ragConfig.recommended_embedding_model && (
+                    <PanelSectionRow>
+                      <ButtonItem
+                        layout="inline"
+                        onClick={doRagModelInstall}
+                        disabled={busy || ragModelInstalling}
+                      >
+                        {ragModelInstalling ? "A instalar…" : `Instalar recomendado ({ragConfig.recommended_embedding_model})`}
+                      </ButtonItem>
+                    </PanelSectionRow>
+                  )}
+                </>
+              )}
+            </>
+          )}
+        </PanelSection>
+      )}
     </PanelSection>
   );
 }

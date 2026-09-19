@@ -94,6 +94,9 @@ const pullModel = callable("pull_model");
 const deleteModel = callable("delete_model");
 const chat = callable("chat");
 const lanInfo = callable("lan_info");
+const searchModels = callable("search_models");
+const getRagConfig = callable("get_rag_config");
+const setRagConfig = callable("set_rag_config");
 function formatSize(size) {
     const units = ["B", "KB", "MB", "GB", "TB"];
     let value = size;
@@ -128,6 +131,13 @@ function Content() {
     const [chatBusy, setChatBusy] = SP_REACT.useState(false);
     const [lanInfoData, setLanInfoData] = SP_REACT.useState(null);
     const [lanInfoLoaded, setLanInfoLoaded] = SP_REACT.useState(false);
+    const [librarySearch, setLibrarySearch] = SP_REACT.useState("");
+    const [libraryTags, setLibraryTags] = SP_REACT.useState([]);
+    const [libraryResults, setLibraryResults] = SP_REACT.useState([]);
+    const [libraryLoading, setLibraryLoading] = SP_REACT.useState(false);
+    const [ragConfig, setRagConfigState] = SP_REACT.useState(null);
+    const [ragDirInput, setRagDirInput] = SP_REACT.useState("");
+    const [ragModelInstalling, setRagModelInstalling] = SP_REACT.useState(false);
     const refresh = async () => {
         try {
             setStatus(await getStatus());
@@ -268,8 +278,134 @@ function Content() {
             if (status.models.length > 0 && !chatModel) {
                 setChatModel(status.models[0].name);
             }
+            loadLibrarySearch();
+            loadRagConfig();
         }
     }, [status?.service_active, status?.models]);
+    const loadLibrarySearch = async () => {
+        setLibraryLoading(true);
+        try {
+            const res = await searchModels(librarySearch, libraryTags.length > 0 ? libraryTags : undefined);
+            if (res.ok) {
+                setLibraryResults(res.models);
+            }
+        }
+        catch (err) {
+            console.error("search_models failed", err);
+        }
+        finally {
+            setLibraryLoading(false);
+        }
+    };
+    const loadRagConfig = async () => {
+        try {
+            const res = await getRagConfig();
+            if (res.ok) {
+                setRagConfigState(res);
+                setRagDirInput(res.rag_documents_dir || "");
+            }
+        }
+        catch (err) {
+            console.error("get_rag_config failed", err);
+        }
+    };
+    const doLibraryInstall = async (modelName) => {
+        setBusy(true);
+        try {
+            const res = await pullModel(modelName);
+            if (!res.ok) {
+                toaster.toast({
+                    title: "Instalação falhou",
+                    body: res.error || `Não foi possível instalar ${modelName}`,
+                    critical: true,
+                });
+            }
+            else {
+                toaster.toast({
+                    title: "Modelo instalado",
+                    body: modelName,
+                });
+                await loadLibrarySearch();
+            }
+        }
+        catch (err) {
+            toaster.toast({
+                title: "Instalação falhou",
+                body: String(err),
+                critical: true,
+            });
+        }
+        finally {
+            setBusy(false);
+            await refresh();
+        }
+    };
+    const doRagDirSave = async () => {
+        setBusy(true);
+        try {
+            const res = await setRagConfig(ragDirInput.trim() || undefined, undefined);
+            if (!res.ok) {
+                toaster.toast({
+                    title: "Falha ao salvar",
+                    body: res.error || "Erro desconhecido",
+                    critical: true,
+                });
+            }
+            else {
+                toaster.toast({ title: "Diretório RAG salvo", body: res.rag_documents_dir });
+                setRagConfigState(res);
+            }
+        }
+        catch (err) {
+            toaster.toast({ title: "Falha ao salvar", body: String(err), critical: true });
+        }
+        finally {
+            setBusy(false);
+        }
+    };
+    const doRagModelInstall = async () => {
+        if (!ragConfig?.recommended_embedding_model)
+            return;
+        setRagModelInstalling(true);
+        setBusy(true);
+        try {
+            const model = ragConfig.recommended_embedding_model;
+            const res = await pullModel(model);
+            if (!res.ok) {
+                toaster.toast({ title: "Instalação falhou", body: res.error || "Erro", critical: true });
+            }
+            else {
+                toaster.toast({ title: "Modelo de embedding instalado", body: model });
+                await loadRagConfig();
+            }
+        }
+        catch (err) {
+            toaster.toast({ title: "Instalação falhou", body: String(err), critical: true });
+        }
+        finally {
+            setRagModelInstalling(false);
+            setBusy(false);
+        }
+    };
+    const doRagModelSet = async (model) => {
+        setBusy(true);
+        try {
+            const res = await setRagConfig(undefined, model);
+            if (!res.ok) {
+                toaster.toast({ title: "Falha ao definir", body: res.error || "Erro", critical: true });
+            }
+            else {
+                toaster.toast({ title: "Modelo de embedding definido", body: model });
+                setRagConfigState(res);
+            }
+        }
+        catch (err) {
+            toaster.toast({ title: "Falha ao definir", body: String(err), critical: true });
+        }
+        finally {
+            setBusy(false);
+        }
+    };
     if (!status) {
         return (SP_JSX.jsx(DFL.PanelSection, { title: "Ollama Deck", children: SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsx("div", { style: { color: "#8b8b8b", padding: "8px 0" }, children: "Loading\u2026" }) }) }));
     }
@@ -367,7 +503,45 @@ function Content() {
                                 justifyContent: "space-between",
                                 alignItems: "center",
                                 color: "#e6e6e6"
-                            }, children: [SP_JSX.jsx("span", { children: m.name }), SP_JSX.jsxs("div", { style: { display: "flex", alignItems: "center", gap: "8px" }, children: [SP_JSX.jsxs("span", { style: { color: "#8b8b8b" }, children: [m.family, " \u00B7 ", formatSize(m.size)] }), SP_JSX.jsx(DFL.ButtonItem, { layout: "inline", disabled: busy || deleteConfirm === m.name, onClick: () => setDeleteConfirm(m.name), description: "Remove este modelo permanentemente", children: "\uD83D\uDDD1" })] })] }), deleteConfirm === m.name && (SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsxs("div", { style: { display: "flex", gap: "8px", justifyContent: "flex-end" }, children: [SP_JSX.jsx(DFL.ButtonItem, { layout: "inline", onClick: () => setDeleteConfirm(null), children: "Cancelar" }), SP_JSX.jsx(DFL.ButtonItem, { layout: "inline", onClick: () => doDelete(m.name), children: "Confirmar remo\u00E7\u00E3o" })] }) }))] }, m.name))) })) : (SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsx("div", { style: { color: "#8b8b8b", fontSize: "12px" }, children: "Nenhum modelo \u2014 liga o servi\u00E7o para listar." }) })), status.error ? (SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsx("div", { style: { color: "#f43f5e", fontSize: "12px" }, children: status.error }) })) : null] }));
+                            }, children: [SP_JSX.jsx("span", { children: m.name }), SP_JSX.jsxs("div", { style: { display: "flex", alignItems: "center", gap: "8px" }, children: [SP_JSX.jsxs("span", { style: { color: "#8b8b8b" }, children: [m.family, " \u00B7 ", formatSize(m.size)] }), SP_JSX.jsx(DFL.ButtonItem, { layout: "inline", disabled: busy || deleteConfirm === m.name, onClick: () => setDeleteConfirm(m.name), description: "Remove este modelo permanentemente", children: "\uD83D\uDDD1" })] })] }), deleteConfirm === m.name && (SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsxs("div", { style: { display: "flex", gap: "8px", justifyContent: "flex-end" }, children: [SP_JSX.jsx(DFL.ButtonItem, { layout: "inline", onClick: () => setDeleteConfirm(null), children: "Cancelar" }), SP_JSX.jsx(DFL.ButtonItem, { layout: "inline", onClick: () => doDelete(m.name), children: "Confirmar remo\u00E7\u00E3o" })] }) }))] }, m.name))) })) : (SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsx("div", { style: { color: "#8b8b8b", fontSize: "12px" }, children: "Nenhum modelo \u2014 liga o servi\u00E7o para listar." }) })), status.error ? (SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsx("div", { style: { color: "#f43f5e", fontSize: "12px" }, children: status.error }) })) : null, status.service_active && (SP_JSX.jsxs(DFL.PanelSection, { title: "Biblioteca de Modelos", children: [SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsx("div", { style: { color: "#8b8b8b", fontSize: "12px", marginBottom: "8px" }, children: "Pesquisar e instalar modelos da biblioteca Ollama" }) }), SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsx("input", { type: "text", value: librarySearch, onChange: (e) => setLibrarySearch(e.target.value), placeholder: "Pesquisar por nome ou descri\u00E7\u00E3o\u2026", style: {
+                                width: "100%",
+                                padding: "8px",
+                                borderRadius: "4px",
+                                border: "1px solid #4a4a4a",
+                                background: "#1a1a1a",
+                                color: "#fafafa",
+                                fontSize: "14px",
+                                marginBottom: "8px",
+                            } }) }), SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsx("div", { style: { display: "flex", gap: "4px", flexWrap: "wrap", marginBottom: "8px" }, children: ["all", "chat", "code", "embedding", "vision", "tools"].map((tag) => {
+                                const isActive = tag === "all" ? libraryTags.length === 0 : libraryTags.includes(tag);
+                                return (SP_JSX.jsx("button", { onClick: () => {
+                                        if (tag === "all") {
+                                            setLibraryTags([]);
+                                        }
+                                        else if (libraryTags.includes(tag)) {
+                                            setLibraryTags(libraryTags.filter((t) => t !== tag));
+                                        }
+                                        else {
+                                            setLibraryTags([...libraryTags, tag]);
+                                        }
+                                    }, style: {
+                                        padding: "4px 10px",
+                                        borderRadius: "4px",
+                                        border: isActive ? "1px solid #22c55e" : "1px solid #4a4a4a",
+                                        background: isActive ? "#22c55e22" : "#1a1a1a",
+                                        color: isActive ? "#22c55e" : "#e6e6e6",
+                                        fontSize: "12px",
+                                        cursor: "pointer",
+                                    }, children: tag === "all" ? "Todos" : tag.charAt(0).toUpperCase() + tag.slice(1) }, tag));
+                            }) }) }), libraryLoading ? (SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsx("div", { style: { color: "#8b8b8b", fontSize: "12px", textAlign: "center", padding: "16px" }, children: "A pesquisar\u2026" }) })) : (SP_JSX.jsx(SP_JSX.Fragment, { children: libraryResults.length > 0 ? (libraryResults.map((m) => (SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsxs("div", { style: { display: "flex", justifyContent: "space-between", alignItems: "center" }, children: [SP_JSX.jsxs("div", { children: [SP_JSX.jsx("div", { style: { color: "#e6e6e6", fontWeight: 500 }, children: m.name }), SP_JSX.jsx("div", { style: { color: "#8b8b8b", fontSize: "11px" }, children: m.description }), SP_JSX.jsx("div", { style: { display: "flex", gap: "4px", marginTop: "4px" }, children: m.tags.map((t) => (SP_JSX.jsx("span", { style: { fontSize: "10px", padding: "2px 6px", background: "#22c55e22", borderRadius: "3px", color: "#22c55e" }, children: t }, t))) })] }), SP_JSX.jsx(DFL.ButtonItem, { layout: "inline", onClick: () => doLibraryInstall(m.name), disabled: busy, description: `Instalar ${m.name}`, children: "Instalar" })] }) }, m.name)))) : (SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsx("div", { style: { color: "#8b8b8b", fontSize: "12px", textAlign: "center", padding: "16px" }, children: "Nenhum modelo encontrado. Tente ajustar a pesquisa." }) })) })), SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsx("div", { style: { color: "#8b8b8b", fontSize: "11px", marginTop: "8px" }, children: "N\u00E3o encontrou? Use \"Instalar modelo\" acima para instalar por tag exata (ex: llama3.2:7b)." }) })] })), status.service_active && (SP_JSX.jsxs(DFL.PanelSection, { title: "Configura\u00E7\u00E3o RAG", children: [SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsx("div", { style: { color: "#8b8b8b", fontSize: "12px", marginBottom: "8px" }, children: "Diret\u00F3rio de documentos para RAG (Retrieval-Augmented Generation)" }) }), SP_JSX.jsxs(DFL.PanelSectionRow, { children: [SP_JSX.jsx("input", { type: "text", value: ragDirInput, onChange: (e) => setRagDirInput(e.target.value), placeholder: "~/Documents/ollama-rag", style: {
+                                    flex: 1,
+                                    padding: "8px",
+                                    borderRadius: "4px",
+                                    border: "1px solid #4a4a4a",
+                                    background: "#1a1a1a",
+                                    color: "#fafafa",
+                                    fontSize: "14px",
+                                } }), SP_JSX.jsx(DFL.ButtonItem, { layout: "inline", onClick: doRagDirSave, disabled: busy, children: "Salvar" })] }), ragConfig && (SP_JSX.jsxs(SP_JSX.Fragment, { children: [SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsxs("div", { style: { color: "#8b8b8b", fontSize: "11px" }, children: ["Diret\u00F3rio atual: ", ragConfig.rag_documents_dir || "não definido"] }) }), SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsx("div", { style: { color: "#8b8b8b", fontSize: "12px", marginBottom: "8px", marginTop: "8px" }, children: "Modelo de Embedding" }) }), ragConfig.installed_embedding_models.length > 0 ? (SP_JSX.jsxs(SP_JSX.Fragment, { children: [SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsxs("div", { style: { color: "#e6e6e6", fontSize: "12px", marginBottom: "4px" }, children: ["Instalados: ", ragConfig.installed_embedding_models.join(", ")] }) }), ragConfig.rag_embedding_model ? (SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsxs("div", { style: { display: "flex", gap: "8px", alignItems: "center" }, children: [SP_JSX.jsxs("span", { style: { color: "#e6e6e6" }, children: ["Ativo: ", ragConfig.rag_embedding_model] }), ragConfig.installed_embedding_models.filter((m) => m !== ragConfig.rag_embedding_model).map((m) => (SP_JSX.jsxs(DFL.ButtonItem, { layout: "inline", onClick: () => doRagModelSet(m), disabled: busy, children: ["Usar ", m] }, m)))] }) })) : (SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsx("div", { style: { display: "flex", gap: "8px" }, children: ragConfig.installed_embedding_models.map((m) => (SP_JSX.jsxs(DFL.ButtonItem, { layout: "inline", onClick: () => doRagModelSet(m), disabled: busy, children: ["Usar ", m] }, m))) }) }))] })) : (SP_JSX.jsxs(SP_JSX.Fragment, { children: [SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsx("div", { style: { color: "#f43f5e", fontSize: "11px", padding: "8px", background: "#f43f5e11", borderRadius: "4px", border: "1px solid #f43f5e33" }, children: "Nenhum modelo de embedding instalado. RAG requer um modelo de embedding." }) }), ragConfig.recommended_embedding_model && (SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsx(DFL.ButtonItem, { layout: "inline", onClick: doRagModelInstall, disabled: busy || ragModelInstalling, children: ragModelInstalling ? "A instalar…" : `Instalar recomendado ({ragConfig.recommended_embedding_model})` }) }))] }))] }))] }))] }));
 }
 var index = definePlugin(() => ({
     name: "Ollama Deck",

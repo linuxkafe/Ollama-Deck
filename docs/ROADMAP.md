@@ -7,6 +7,9 @@
 ## Done (sprint-02)
 - [x] T005 Chat com Ollama no Gaming Mode + Info de conexão LAN.
 
+## Done (sprint-03)
+- [x] T006 Model Search & Install + RAG Directory with Embedding Model Resolution
+
 ## Backlog
 | Item | Impacto | Esforço | Prioridade | Estado |
 |------|---------|---------|-----------|--------|
