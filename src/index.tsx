@@ -3,10 +3,11 @@ import {
   PanelSectionRow,
   ToggleField,
   ButtonItem,
-  staticClasses
+  staticClasses,
+  showModal
 } from "@decky/ui";
 import { callable, definePlugin, toaster } from "@decky/api";
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import { FaRobot, FaDownload } from "react-icons/fa";
 
 type ModelInfo = {
@@ -143,10 +144,7 @@ function Content() {
   const [pullModalOpen, setPullModalOpen] = useState(false);
   const [pullModelName, setPullModelName] = useState("");
   const [deleteConfirm, setDeleteConfirm] = useState<string | null>(null);
-  const [chatMessages, setChatMessages] = useState<ChatMessage[]>([]);
-  const [chatInput, setChatInput] = useState("");
   const [chatModel, setChatModel] = useState("");
-  const [chatBusy, setChatBusy] = useState(false);
   const [lanInfoData, setLanInfoData] = useState<LanInfoResult | null>(null);
   const [lanInfoLoaded, setLanInfoLoaded] = useState(false);
   const [librarySearch, setLibrarySearch] = useState("");
@@ -253,34 +251,22 @@ function Content() {
     }
   };
 
-  const doChat = async () => {
-    if (!chatInput.trim() || !chatModel) return;
-    const prompt = chatInput.trim();
-    setChatInput("");
-    setChatBusy(true);
-    setChatMessages((prev) => [...prev, { role: "user", content: prompt }]);
-    try {
-      const res = await chat(chatModel, prompt);
-      if (!res.ok) {
-        toaster.toast({
-          title: "Chat falhou",
-          body: res.error || "Erro desconhecido",
-          critical: true,
-        });
-        setChatMessages((prev) => [...prev, { role: "assistant", content: `Erro: ${res.error}` }]);
-      } else {
-        setChatMessages((prev) => [...prev, { role: "assistant", content: res.response || "" }]);
+  const openChatModal = () => {
+    if (!status?.service_active || status.models.length === 0) return;
+    showModal(
+      <ChatModal
+        models={status.models}
+        initialModel={chatModel || status.models[0].name}
+      />,
+      undefined,
+      {
+        strTitle: "Chat Ollama",
+        bForcePopOut: true,
+        bHideActionIcons: false,
+        bHideMainWindowForPopouts: false,
+        bNeverPopOut: false,
       }
-    } catch (err) {
-      toaster.toast({
-        title: "Chat falhou",
-        body: String(err),
-        critical: true,
-      });
-      setChatMessages((prev) => [...prev, { role: "assistant", content: `Erro: ${err}` }]);
-    } finally {
-      setChatBusy(false);
-    }
+    );
   };
 
   useEffect(() => {
@@ -508,7 +494,7 @@ function Content() {
   return (
     <PanelSection title="Ollama Deck">
       <PanelSectionRow>
-        <div style={{ display: "flex", alignItems: "center", color: "#e6e6e6" }}>
+        <div style={{ display: "flex", alignItems: "center", color: "#e6e6e6", marginBottom: "8px" }}>
           <StatusDot ok={status.service_active && status.api_reachable} />
           <span>
             {status.service_active
@@ -536,11 +522,11 @@ function Content() {
       </PanelSectionRow>
 
       {status.keep_awake_locked ? (
-        <PanelSectionRow>
-          <div style={{ color: "#8b8b8b", fontSize: "12px", padding: "4px 0" }}>
-            O Deck não suspende enquanto o serviço estiver ativo.
-          </div>
-        </PanelSectionRow>
+<PanelSectionRow>
+        <div style={{ color: "#8b8b8b", fontSize: "12px", padding: "4px 0", marginBottom: "8px" }}>
+          O Deck não suspende enquanto o serviço estiver ativo.
+        </div>
+      </PanelSectionRow>
       ) : null}
 
       <PanelSectionRow>
@@ -575,7 +561,7 @@ function Content() {
 
       {status.api_url && status.service_active ? (
         <PanelSectionRow>
-          <div style={{ color: "#8b8b8b", fontSize: "12px" }}>
+          <div style={{ color: "#8b8b8b", fontSize: "12px", marginBottom: "8px" }}>
             API: {status.api_url}
           </div>
         </PanelSectionRow>
@@ -618,84 +604,19 @@ function Content() {
       </PanelSection>
 
       {status.service_active && status.models.length > 0 ? (
-        <PanelSection title="Chat">
-          <PanelSectionRow>
-            <select
-              value={chatModel}
-              onChange={(e) => setChatModel(e.target.value)}
-              disabled={chatBusy}
-              style={{
-                width: "100%",
-                padding: "8px",
-                borderRadius: "4px",
-                border: "1px solid #4a4a4a",
-                background: "#1a1a1a",
-                color: "#fafafa",
-                fontSize: "14px",
-              }}
+        <PanelSectionRow>
+          <div style={{ marginBottom: "8px" }}>
+            <ButtonItem
+              layout="below"
+              disabled={busy}
+              onClick={openChatModal}
+              description="Abre o chat em janela completa para melhor conforto."
             >
-              {status.models.map((m) => (
-                <option key={m.name} value={m.name}>
-                  {m.name}
-                </option>
-              ))}
-            </select>
-          </PanelSectionRow>
-          <PanelSectionRow>
-            <div
-              style={{
-                maxHeight: "200px",
-                overflowY: "auto",
-                marginBottom: "8px",
-                padding: "8px",
-                background: "#1a1a1a",
-                borderRadius: "4px",
-                border: "1px solid #4a4a4a",
-              }}
-            >
-              {chatMessages.map((msg, idx) => (
-                <div key={idx} style={{ marginBottom: "8px", padding: "8px", borderRadius: "4px", background: msg.role === "user" ? "#22c55e22" : "#22c55e11" }}>
-                  <div style={{ fontSize: "11px", color: "#8b8b8b", marginBottom: "4px" }}>
-                    {msg.role === "user" ? "Você" : "Ollama"}
-                  </div>
-                  <div style={{ color: "#fafafa", whiteSpace: "pre-wrap", wordBreak: "break-word" }}>
-                    {msg.content}
-                  </div>
-                </div>
-              ))}
-              {chatBusy && (
-                <div style={{ padding: "8px", color: "#22c55e" }}>
-                  ⋮ Ollama a pensar…
-                </div>
-              )}
-            </div>
-          </PanelSectionRow>
-          <PanelSectionRow>
-            <div style={{ display: "flex", gap: "8px" }}>
-              <input
-                type="text"
-                value={chatInput}
-                onChange={(e) => setChatInput(e.target.value)}
-                onKeyDown={(e) => e.key === "Enter" && !chatBusy && doChat()}
-                placeholder="Digite a sua pergunta…"
-                disabled={chatBusy || !chatModel}
-                style={{
-                  flex: 1,
-                  padding: "8px",
-                  borderRadius: "4px",
-                  border: "1px solid #4a4a4a",
-                  background: "#1a1a1a",
-                  color: "#fafafa",
-                  fontSize: "14px",
-                }}
-                autoFocus
-              />
-              <ButtonItem layout="inline" onClick={doChat} disabled={chatBusy || !chatInput.trim() || !chatModel}>
-                Enviar
-              </ButtonItem>
-            </div>
-          </PanelSectionRow>
-        </PanelSection>
+              <FaRobot style={{ marginRight: "8px", verticalAlign: "middle" }} />
+              Abrir Chat
+            </ButtonItem>
+          </div>
+        </PanelSectionRow>
       ) : null}
 
       {status.service_active ? (
@@ -709,13 +630,13 @@ function Content() {
             <>
               {lanInfoData.warning && (
                 <PanelSectionRow>
-                  <div style={{ color: "#f43f5e", fontSize: "11px", padding: "8px", background: "#f43f5e11", borderRadius: "4px", border: "1px solid #f43f5e33" }}>
+                  <div style={{ color: "#f43f5e", fontSize: "11px", padding: "8px", background: "#f43f5e11", borderRadius: "4px", border: "1px solid #f43f5e33", marginBottom: "8px" }}>
                     {lanInfoData.warning}
                   </div>
                 </PanelSectionRow>
               )}
               <PanelSectionRow>
-                <div style={{ color: "#e6e6e6", fontSize: "12px" }}>
+                <div style={{ color: "#e6e6e6", fontSize: "12px", marginBottom: "8px" }}>
                   <strong>Endereço:</strong> {lanInfoData.base_url}
                 </div>
               </PanelSectionRow>
@@ -731,7 +652,7 @@ function Content() {
               </PanelSectionRow>
               {lanInfoData.examples && Object.entries(lanInfoData.examples).map(([lang, cmd]) => (
                 <PanelSectionRow key={lang}>
-                  <div style={{ display: "flex", gap: "8px", alignItems: "center" }}>
+                  <div style={{ display: "flex", gap: "8px", alignItems: "center", marginBottom: "8px" }}>
                     <code style={{ flex: 1, fontSize: "10px", background: "#1a1a1a", padding: "4px 8px", borderRadius: "4px", color: "#22c55e", whiteSpace: "pre-wrap", wordBreak: "break-all" }}>
                       {cmd}
                     </code>
@@ -800,7 +721,7 @@ function Content() {
         </PanelSection>
       ) : (
         <PanelSectionRow>
-          <div style={{ color: "#8b8b8b", fontSize: "12px" }}>
+          <div style={{ color: "#8b8b8b", fontSize: "12px", marginBottom: "8px" }}>
             Nenhum modelo — liga o serviço para listar.
           </div>
         </PanelSectionRow>
@@ -808,7 +729,7 @@ function Content() {
 
       {status.error ? (
         <PanelSectionRow>
-          <div style={{ color: "#f43f5e", fontSize: "12px" }}>{status.error}</div>
+          <div style={{ color: "#f43f5e", fontSize: "12px", marginBottom: "8px" }}>{status.error}</div>
         </PanelSectionRow>
       ) : null}
 
@@ -880,7 +801,7 @@ function Content() {
               {libraryResults.length > 0 ? (
                 libraryResults.map((m) => (
                   <PanelSectionRow key={m.name}>
-                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "8px" }}>
                       <div>
                         <div style={{ color: "#e6e6e6", fontWeight: 500 }}>{m.name}</div>
                         <div style={{ color: "#8b8b8b", fontSize: "11px" }}>
@@ -952,7 +873,7 @@ function Content() {
           {ragConfig && (
             <>
               <PanelSectionRow>
-                <div style={{ color: "#8b8b8b", fontSize: "11px" }}>
+                <div style={{ color: "#8b8b8b", fontSize: "11px", marginBottom: "8px" }}>
                   Diretório atual: {ragConfig.rag_documents_dir || "não definido"}
                 </div>
               </PanelSectionRow>
@@ -970,7 +891,7 @@ function Content() {
                   </PanelSectionRow>
                   {ragConfig.rag_embedding_model ? (
                     <PanelSectionRow>
-                      <div style={{ display: "flex", gap: "8px", alignItems: "center" }}>
+                      <div style={{ display: "flex", gap: "8px", alignItems: "center", marginBottom: "8px" }}>
                         <span style={{ color: "#e6e6e6" }}>Ativo: {ragConfig.rag_embedding_model}</span>
                         {ragConfig.installed_embedding_models.filter((m) => m !== ragConfig.rag_embedding_model).map((m) => (
                           <ButtonItem
@@ -986,7 +907,7 @@ function Content() {
                     </PanelSectionRow>
                   ) : (
                     <PanelSectionRow>
-                      <div style={{ display: "flex", gap: "8px" }}>
+                      <div style={{ display: "flex", gap: "8px", marginBottom: "8px" }}>
                         {ragConfig.installed_embedding_models.map((m) => (
                           <ButtonItem
                             key={m}
@@ -1004,7 +925,7 @@ function Content() {
               ) : (
                 <>
                   <PanelSectionRow>
-                    <div style={{ color: "#f43f5e", fontSize: "11px", padding: "8px", background: "#f43f5e11", borderRadius: "4px", border: "1px solid #f43f5e33" }}>
+                    <div style={{ color: "#f43f5e", fontSize: "11px", padding: "8px", background: "#f43f5e11", borderRadius: "4px", border: "1px solid #f43f5e33", marginBottom: "8px" }}>
                       Nenhum modelo de embedding instalado. RAG requer um modelo de embedding.
                     </div>
                   </PanelSectionRow>
@@ -1026,6 +947,144 @@ function Content() {
         </PanelSection>
       )}
     </PanelSection>
+  );
+}
+ 
+function ChatModal({
+  models,
+  initialModel
+}: {
+  models: ModelInfo[];
+  initialModel: string;
+}) {
+  const [chatMessages, setChatMessages] = useState<ChatMessage[]>([]);
+  const [chatInput, setChatInput] = useState("");
+  const [chatModel, setChatModel] = useState(initialModel);
+  const [chatBusy, setChatBusy] = useState(false);
+  const messagesEndRef = useRef<HTMLDivElement>(null);
+
+  const scrollToBottom = () => {
+    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+  };
+
+  useEffect(() => {
+    scrollToBottom();
+  }, [chatMessages]);
+
+  const handleSend = async () => {
+    if (!chatInput.trim() || !chatModel || chatBusy) return;
+    const prompt = chatInput.trim();
+    setChatInput("");
+    setChatBusy(true);
+    setChatMessages((prev) => [...prev, { role: "user", content: prompt }]);
+    try {
+      const res = await chat(chatModel, prompt);
+      if (!res.ok) {
+        toaster.toast({
+          title: "Chat falhou",
+          body: res.error || "Erro desconhecido",
+          critical: true,
+        });
+        setChatMessages((prev) => [...prev, { role: "assistant", content: `Erro: ${res.error}` }]);
+      } else {
+        setChatMessages((prev) => [...prev, { role: "assistant", content: res.response || "" }]);
+      }
+    } catch (err) {
+      toaster.toast({
+        title: "Chat falhou",
+        body: String(err),
+        critical: true,
+      });
+      setChatMessages((prev) => [...prev, { role: "assistant", content: `Erro: ${err}` }]);
+    } finally {
+      setChatBusy(false);
+    }
+  };
+
+  return (
+    <div style={{ display: "flex", flexDirection: "column", height: "100%", minHeight: "500px" }}>
+      <div style={{ padding: "12px 16px", borderBottom: "1px solid #4a4a4a", background: "#1a1a1a" }}>
+        <select
+          value={chatModel}
+          onChange={(e) => setChatModel(e.target.value)}
+          disabled={chatBusy}
+          style={{
+            width: "100%",
+            padding: "10px",
+            borderRadius: "6px",
+            border: "1px solid #4a4a4a",
+            background: "#1a1a1a",
+            color: "#fafafa",
+            fontSize: "16px",
+          }}
+        >
+          {models.map((m) => (
+            <option key={m.name} value={m.name}>
+              {m.name}
+            </option>
+          ))}
+        </select>
+      </div>
+      <div
+        style={{
+          flex: 1,
+          overflowY: "auto",
+          padding: "16px",
+          background: "#0a0a0a",
+        }}
+      >
+        {chatMessages.map((msg, idx) => (
+          <div
+            key={idx}
+            style={{
+              marginBottom: "16px",
+              padding: "12px",
+              borderRadius: "8px",
+              background: msg.role === "user" ? "#22c55e22" : "#1a1a1a",
+              border: msg.role === "user" ? "1px solid #22c55e44" : "1px solid #4a4a4a",
+            }}
+          >
+            <div style={{ fontSize: "12px", color: "#8b8b8b", marginBottom: "8px", fontWeight: 500 }}>
+              {msg.role === "user" ? "Você" : "Ollama"}
+            </div>
+            <div style={{ color: "#fafafa", whiteSpace: "pre-wrap", wordBreak: "break-word", lineHeight: "1.5", fontSize: "15px" }}>
+              {msg.content}
+            </div>
+          </div>
+        ))}
+        {chatBusy && (
+          <div style={{ padding: "12px", color: "#22c55e", fontStyle: "italic" }}>
+            Ollama a pensar…
+          </div>
+        )}
+        <div ref={messagesEndRef} />
+      </div>
+      <div style={{ padding: "16px", borderTop: "1px solid #4a4a4a", background: "#1a1a1a" }}>
+        <div style={{ display: "flex", gap: "12px" }}>
+          <input
+            type="text"
+            value={chatInput}
+            onChange={(e) => setChatInput(e.target.value)}
+            onKeyDown={(e) => e.key === "Enter" && !chatBusy && handleSend()}
+            placeholder="Digite a sua pergunta…"
+            disabled={chatBusy || !chatModel}
+            autoFocus
+            style={{
+              flex: 1,
+              padding: "14px",
+              borderRadius: "8px",
+              border: "1px solid #4a4a4a",
+              background: "#0a0a0a",
+              color: "#fafafa",
+              fontSize: "16px",
+            }}
+          />
+          <ButtonItem layout="inline" onClick={handleSend} disabled={chatBusy || !chatInput.trim() || !chatModel}>
+            Enviar
+          </ButtonItem>
+        </div>
+      </div>
+    </div>
   );
 }
 

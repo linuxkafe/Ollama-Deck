@@ -125,10 +125,7 @@ function Content() {
     const [pullModalOpen, setPullModalOpen] = SP_REACT.useState(false);
     const [pullModelName, setPullModelName] = SP_REACT.useState("");
     const [deleteConfirm, setDeleteConfirm] = SP_REACT.useState(null);
-    const [chatMessages, setChatMessages] = SP_REACT.useState([]);
-    const [chatInput, setChatInput] = SP_REACT.useState("");
     const [chatModel, setChatModel] = SP_REACT.useState("");
-    const [chatBusy, setChatBusy] = SP_REACT.useState(false);
     const [lanInfoData, setLanInfoData] = SP_REACT.useState(null);
     const [lanInfoLoaded, setLanInfoLoaded] = SP_REACT.useState(false);
     const [librarySearch, setLibrarySearch] = SP_REACT.useState("");
@@ -239,38 +236,16 @@ function Content() {
             console.error("lan_info failed", err);
         }
     };
-    const doChat = async () => {
-        if (!chatInput.trim() || !chatModel)
+    const openChatModal = () => {
+        if (!status?.service_active || status.models.length === 0)
             return;
-        const prompt = chatInput.trim();
-        setChatInput("");
-        setChatBusy(true);
-        setChatMessages((prev) => [...prev, { role: "user", content: prompt }]);
-        try {
-            const res = await chat(chatModel, prompt);
-            if (!res.ok) {
-                toaster.toast({
-                    title: "Chat falhou",
-                    body: res.error || "Erro desconhecido",
-                    critical: true,
-                });
-                setChatMessages((prev) => [...prev, { role: "assistant", content: `Erro: ${res.error}` }]);
-            }
-            else {
-                setChatMessages((prev) => [...prev, { role: "assistant", content: res.response || "" }]);
-            }
-        }
-        catch (err) {
-            toaster.toast({
-                title: "Chat falhou",
-                body: String(err),
-                critical: true,
-            });
-            setChatMessages((prev) => [...prev, { role: "assistant", content: `Erro: ${err}` }]);
-        }
-        finally {
-            setChatBusy(false);
-        }
+        DFL.showModal(SP_JSX.jsx(ChatModal, { models: status.models, initialModel: chatModel || status.models[0].name }), undefined, {
+            strTitle: "Chat Ollama",
+            bForcePopOut: true,
+            bHideActionIcons: false,
+            bHideMainWindowForPopouts: false,
+            bNeverPopOut: false,
+        });
     };
     SP_REACT.useEffect(() => {
         if (status?.service_active) {
@@ -458,52 +433,28 @@ function Content() {
             await refresh();
         }
     };
-    return (SP_JSX.jsxs(DFL.PanelSection, { title: "Ollama Deck", children: [SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsxs("div", { style: { display: "flex", alignItems: "center", color: "#e6e6e6" }, children: [SP_JSX.jsx(StatusDot, { ok: status.service_active && status.api_reachable }), SP_JSX.jsxs("span", { children: [status.service_active
+    return (SP_JSX.jsxs(DFL.PanelSection, { title: "Ollama Deck", children: [SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsxs("div", { style: { display: "flex", alignItems: "center", color: "#e6e6e6", marginBottom: "8px" }, children: [SP_JSX.jsx(StatusDot, { ok: status.service_active && status.api_reachable }), SP_JSX.jsxs("span", { children: [status.service_active
                                     ? status.api_reachable
                                         ? "Serving"
                                         : "Starting…"
                                     : "Stopped", status.version ? ` · Ollama ${status.version}` : ""] })] }) }), SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsx(DFL.ToggleField, { label: "Ollama Service", description: status.service_active
                         ? "Serviço ativo (start). Desliga on demand."
-                        : "Serviço parado. Liga on demand.", checked: status.service_active, disabled: busy, onChange: (on) => run(() => setService(on)) }) }), status.keep_awake_locked ? (SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsx("div", { style: { color: "#8b8b8b", fontSize: "12px", padding: "4px 0" }, children: "O Deck n\u00E3o suspende enquanto o servi\u00E7o estiver ativo." }) })) : null, SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsx(DFL.ToggleField, { label: "Keep Deck Awake", description: status.service_active
+                        : "Serviço parado. Liga on demand.", checked: status.service_active, disabled: busy, onChange: (on) => run(() => setService(on)) }) }), status.keep_awake_locked ? (SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsx("div", { style: { color: "#8b8b8b", fontSize: "12px", padding: "4px 0", marginBottom: "8px" }, children: "O Deck n\u00E3o suspende enquanto o servi\u00E7o estiver ativo." }) })) : null, SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsx(DFL.ToggleField, { label: "Keep Deck Awake", description: status.service_active
                         ? status.keep_awake_locked
                             ? "Suspensão bloqueada durante inferências."
                             : "Ativar para impedir a suspensão do Deck."
                         : "Eficaz enquanto o serviço estiver ativo.", checked: status.keep_awake, disabled: busy, onChange: (on) => run(() => setKeepAwake(on)) }) }), SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsx(DFL.ToggleField, { label: "Start with Steam Deck", description: status.autostart
                         ? "O serviço arranca com a sessão do utilizador."
-                        : "O serviço arranca apenas por pedido.", checked: status.autostart, disabled: busy, onChange: (on) => run(() => setAutostart(on)) }) }), status.api_url && status.service_active ? (SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsxs("div", { style: { color: "#8b8b8b", fontSize: "12px" }, children: ["API: ", status.api_url] }) })) : null, SP_JSX.jsxs(DFL.PanelSection, { title: "Updates", children: [SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsxs(DFL.ButtonItem, { layout: "below", disabled: busy, onClick: doUpdate, description: status.service_active
+                        : "O serviço arranca apenas por pedido.", checked: status.autostart, disabled: busy, onChange: (on) => run(() => setAutostart(on)) }) }), status.api_url && status.service_active ? (SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsxs("div", { style: { color: "#8b8b8b", fontSize: "12px", marginBottom: "8px" }, children: ["API: ", status.api_url] }) })) : null, SP_JSX.jsxs(DFL.PanelSection, { title: "Updates", children: [SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsxs(DFL.ButtonItem, { layout: "below", disabled: busy, onClick: doUpdate, description: status.service_active
                                 ? "Atualiza o binário e faz pull dos modelos instalados."
                                 : "Atualiza o binário; os modelos listados serão puxados.", children: [SP_JSX.jsx(FaDownload, { style: { marginRight: "8px", verticalAlign: "middle" } }), "Update Ollama & models"] }) }), SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsxs(DFL.ButtonItem, { layout: "below", disabled: busy || !status.service_active, onClick: () => setPullModalOpen(true), description: "Instala um novo modelo (ex: llama3.2, mistral:7b). Requer servi\u00E7o ativo.", children: [SP_JSX.jsx(FaDownload, { style: { marginRight: "8px", verticalAlign: "middle" } }), "Instalar modelo"] }) }), SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsx("div", { style: { color: "#8b8b8b", fontSize: "12px" }, children: busy
                                 ? "A atualizar… a inferência fica em pausa."
-                                : `Versão atual: ${status.version ?? "—"}. Modelos: ${status.models.length}.` }) })] }), status.service_active && status.models.length > 0 ? (SP_JSX.jsxs(DFL.PanelSection, { title: "Chat", children: [SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsx("select", { value: chatModel, onChange: (e) => setChatModel(e.target.value), disabled: chatBusy, style: {
-                                width: "100%",
-                                padding: "8px",
-                                borderRadius: "4px",
-                                border: "1px solid #4a4a4a",
-                                background: "#1a1a1a",
-                                color: "#fafafa",
-                                fontSize: "14px",
-                            }, children: status.models.map((m) => (SP_JSX.jsx("option", { value: m.name, children: m.name }, m.name))) }) }), SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsxs("div", { style: {
-                                maxHeight: "200px",
-                                overflowY: "auto",
-                                marginBottom: "8px",
-                                padding: "8px",
-                                background: "#1a1a1a",
-                                borderRadius: "4px",
-                                border: "1px solid #4a4a4a",
-                            }, children: [chatMessages.map((msg, idx) => (SP_JSX.jsxs("div", { style: { marginBottom: "8px", padding: "8px", borderRadius: "4px", background: msg.role === "user" ? "#22c55e22" : "#22c55e11" }, children: [SP_JSX.jsx("div", { style: { fontSize: "11px", color: "#8b8b8b", marginBottom: "4px" }, children: msg.role === "user" ? "Você" : "Ollama" }), SP_JSX.jsx("div", { style: { color: "#fafafa", whiteSpace: "pre-wrap", wordBreak: "break-word" }, children: msg.content })] }, idx))), chatBusy && (SP_JSX.jsx("div", { style: { padding: "8px", color: "#22c55e" }, children: "\u22EE Ollama a pensar\u2026" }))] }) }), SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsxs("div", { style: { display: "flex", gap: "8px" }, children: [SP_JSX.jsx("input", { type: "text", value: chatInput, onChange: (e) => setChatInput(e.target.value), onKeyDown: (e) => e.key === "Enter" && !chatBusy && doChat(), placeholder: "Digite a sua pergunta\u2026", disabled: chatBusy || !chatModel, style: {
-                                        flex: 1,
-                                        padding: "8px",
-                                        borderRadius: "4px",
-                                        border: "1px solid #4a4a4a",
-                                        background: "#1a1a1a",
-                                        color: "#fafafa",
-                                        fontSize: "14px",
-                                    }, autoFocus: true }), SP_JSX.jsx(DFL.ButtonItem, { layout: "inline", onClick: doChat, disabled: chatBusy || !chatInput.trim() || !chatModel, children: "Enviar" })] }) })] })) : null, status.service_active ? (SP_JSX.jsxs(DFL.PanelSection, { title: "Conex\u00E3o LAN", children: [SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsx("div", { style: { color: "#8b8b8b", fontSize: "12px", marginBottom: "8px" }, children: "Informa\u00E7\u00E3o para ligar a partir de outros equipamentos na rede:" }) }), lanInfoData ? (SP_JSX.jsxs(SP_JSX.Fragment, { children: [lanInfoData.warning && (SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsx("div", { style: { color: "#f43f5e", fontSize: "11px", padding: "8px", background: "#f43f5e11", borderRadius: "4px", border: "1px solid #f43f5e33" }, children: lanInfoData.warning }) })), SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsxs("div", { style: { color: "#e6e6e6", fontSize: "12px" }, children: [SP_JSX.jsx("strong", { children: "Endere\u00E7o:" }), " ", lanInfoData.base_url] }) }), SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsxs("div", { style: { color: "#8b8b8b", fontSize: "11px", marginBottom: "8px" }, children: ["Modelos dispon\u00EDveis: ", lanInfoData.models?.join(", ") || "nenhum"] }) }), SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsx("div", { style: { color: "#8b8b8b", fontSize: "11px", marginBottom: "8px" }, children: "Exemplos de uso:" }) }), lanInfoData.examples && Object.entries(lanInfoData.examples).map(([lang, cmd]) => (SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsxs("div", { style: { display: "flex", gap: "8px", alignItems: "center" }, children: [SP_JSX.jsx("code", { style: { flex: 1, fontSize: "10px", background: "#1a1a1a", padding: "4px 8px", borderRadius: "4px", color: "#22c55e", whiteSpace: "pre-wrap", wordBreak: "break-all" }, children: cmd }), SP_JSX.jsx(DFL.ButtonItem, { layout: "inline", onClick: () => navigator.clipboard.writeText(cmd), disabled: busy, children: "Copiar" })] }) }, lang)))] })) : (SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsx("div", { style: { color: "#8b8b8b", fontSize: "12px" }, children: "A carregar informa\u00E7\u00E3o LAN\u2026" }) }))] })) : null, status.models.length > 0 ? (SP_JSX.jsx(DFL.PanelSection, { title: "Models", children: status.models.map((m) => (SP_JSX.jsxs(DFL.PanelSectionRow, { children: [SP_JSX.jsxs("div", { style: {
+                                : `Versão atual: ${status.version ?? "—"}. Modelos: ${status.models.length}.` }) })] }), status.service_active && status.models.length > 0 ? (SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsx("div", { style: { marginBottom: "8px" }, children: SP_JSX.jsxs(DFL.ButtonItem, { layout: "below", disabled: busy, onClick: openChatModal, description: "Abre o chat em janela completa para melhor conforto.", children: [SP_JSX.jsx(FaRobot, { style: { marginRight: "8px", verticalAlign: "middle" } }), "Abrir Chat"] }) }) })) : null, status.service_active ? (SP_JSX.jsxs(DFL.PanelSection, { title: "Conex\u00E3o LAN", children: [SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsx("div", { style: { color: "#8b8b8b", fontSize: "12px", marginBottom: "8px" }, children: "Informa\u00E7\u00E3o para ligar a partir de outros equipamentos na rede:" }) }), lanInfoData ? (SP_JSX.jsxs(SP_JSX.Fragment, { children: [lanInfoData.warning && (SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsx("div", { style: { color: "#f43f5e", fontSize: "11px", padding: "8px", background: "#f43f5e11", borderRadius: "4px", border: "1px solid #f43f5e33", marginBottom: "8px" }, children: lanInfoData.warning }) })), SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsxs("div", { style: { color: "#e6e6e6", fontSize: "12px", marginBottom: "8px" }, children: [SP_JSX.jsx("strong", { children: "Endere\u00E7o:" }), " ", lanInfoData.base_url] }) }), SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsxs("div", { style: { color: "#8b8b8b", fontSize: "11px", marginBottom: "8px" }, children: ["Modelos dispon\u00EDveis: ", lanInfoData.models?.join(", ") || "nenhum"] }) }), SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsx("div", { style: { color: "#8b8b8b", fontSize: "11px", marginBottom: "8px" }, children: "Exemplos de uso:" }) }), lanInfoData.examples && Object.entries(lanInfoData.examples).map(([lang, cmd]) => (SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsxs("div", { style: { display: "flex", gap: "8px", alignItems: "center", marginBottom: "8px" }, children: [SP_JSX.jsx("code", { style: { flex: 1, fontSize: "10px", background: "#1a1a1a", padding: "4px 8px", borderRadius: "4px", color: "#22c55e", whiteSpace: "pre-wrap", wordBreak: "break-all" }, children: cmd }), SP_JSX.jsx(DFL.ButtonItem, { layout: "inline", onClick: () => navigator.clipboard.writeText(cmd), disabled: busy, children: "Copiar" })] }) }, lang)))] })) : (SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsx("div", { style: { color: "#8b8b8b", fontSize: "12px" }, children: "A carregar informa\u00E7\u00E3o LAN\u2026" }) }))] })) : null, status.models.length > 0 ? (SP_JSX.jsx(DFL.PanelSection, { title: "Models", children: status.models.map((m) => (SP_JSX.jsxs(DFL.PanelSectionRow, { children: [SP_JSX.jsxs("div", { style: {
                                 display: "flex",
                                 justifyContent: "space-between",
                                 alignItems: "center",
                                 color: "#e6e6e6"
-                            }, children: [SP_JSX.jsx("span", { children: m.name }), SP_JSX.jsxs("div", { style: { display: "flex", alignItems: "center", gap: "8px" }, children: [SP_JSX.jsxs("span", { style: { color: "#8b8b8b" }, children: [m.family, " \u00B7 ", formatSize(m.size)] }), SP_JSX.jsx(DFL.ButtonItem, { layout: "inline", disabled: busy || deleteConfirm === m.name, onClick: () => setDeleteConfirm(m.name), description: "Remove este modelo permanentemente", children: "\uD83D\uDDD1" })] })] }), deleteConfirm === m.name && (SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsxs("div", { style: { display: "flex", gap: "8px", justifyContent: "flex-end" }, children: [SP_JSX.jsx(DFL.ButtonItem, { layout: "inline", onClick: () => setDeleteConfirm(null), children: "Cancelar" }), SP_JSX.jsx(DFL.ButtonItem, { layout: "inline", onClick: () => doDelete(m.name), children: "Confirmar remo\u00E7\u00E3o" })] }) }))] }, m.name))) })) : (SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsx("div", { style: { color: "#8b8b8b", fontSize: "12px" }, children: "Nenhum modelo \u2014 liga o servi\u00E7o para listar." }) })), status.error ? (SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsx("div", { style: { color: "#f43f5e", fontSize: "12px" }, children: status.error }) })) : null, status.service_active && (SP_JSX.jsxs(DFL.PanelSection, { title: "Biblioteca de Modelos", children: [SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsx("div", { style: { color: "#8b8b8b", fontSize: "12px", marginBottom: "8px" }, children: "Pesquisar e instalar modelos da biblioteca Ollama" }) }), SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsx("input", { type: "text", value: librarySearch, onChange: (e) => setLibrarySearch(e.target.value), placeholder: "Pesquisar por nome ou descri\u00E7\u00E3o\u2026", style: {
+                            }, children: [SP_JSX.jsx("span", { children: m.name }), SP_JSX.jsxs("div", { style: { display: "flex", alignItems: "center", gap: "8px" }, children: [SP_JSX.jsxs("span", { style: { color: "#8b8b8b" }, children: [m.family, " \u00B7 ", formatSize(m.size)] }), SP_JSX.jsx(DFL.ButtonItem, { layout: "inline", disabled: busy || deleteConfirm === m.name, onClick: () => setDeleteConfirm(m.name), description: "Remove este modelo permanentemente", children: "\uD83D\uDDD1" })] })] }), deleteConfirm === m.name && (SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsxs("div", { style: { display: "flex", gap: "8px", justifyContent: "flex-end" }, children: [SP_JSX.jsx(DFL.ButtonItem, { layout: "inline", onClick: () => setDeleteConfirm(null), children: "Cancelar" }), SP_JSX.jsx(DFL.ButtonItem, { layout: "inline", onClick: () => doDelete(m.name), children: "Confirmar remo\u00E7\u00E3o" })] }) }))] }, m.name))) })) : (SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsx("div", { style: { color: "#8b8b8b", fontSize: "12px", marginBottom: "8px" }, children: "Nenhum modelo \u2014 liga o servi\u00E7o para listar." }) })), status.error ? (SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsx("div", { style: { color: "#f43f5e", fontSize: "12px", marginBottom: "8px" }, children: status.error }) })) : null, status.service_active && (SP_JSX.jsxs(DFL.PanelSection, { title: "Biblioteca de Modelos", children: [SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsx("div", { style: { color: "#8b8b8b", fontSize: "12px", marginBottom: "8px" }, children: "Pesquisar e instalar modelos da biblioteca Ollama" }) }), SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsx("input", { type: "text", value: librarySearch, onChange: (e) => setLibrarySearch(e.target.value), placeholder: "Pesquisar por nome ou descri\u00E7\u00E3o\u2026", style: {
                                 width: "100%",
                                 padding: "8px",
                                 borderRadius: "4px",
@@ -533,7 +484,7 @@ function Content() {
                                         fontSize: "12px",
                                         cursor: "pointer",
                                     }, children: tag === "all" ? "Todos" : tag.charAt(0).toUpperCase() + tag.slice(1) }, tag));
-                            }) }) }), libraryLoading ? (SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsx("div", { style: { color: "#8b8b8b", fontSize: "12px", textAlign: "center", padding: "16px" }, children: "A pesquisar\u2026" }) })) : (SP_JSX.jsx(SP_JSX.Fragment, { children: libraryResults.length > 0 ? (libraryResults.map((m) => (SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsxs("div", { style: { display: "flex", justifyContent: "space-between", alignItems: "center" }, children: [SP_JSX.jsxs("div", { children: [SP_JSX.jsx("div", { style: { color: "#e6e6e6", fontWeight: 500 }, children: m.name }), SP_JSX.jsx("div", { style: { color: "#8b8b8b", fontSize: "11px" }, children: m.description }), SP_JSX.jsx("div", { style: { display: "flex", gap: "4px", marginTop: "4px" }, children: m.tags.map((t) => (SP_JSX.jsx("span", { style: { fontSize: "10px", padding: "2px 6px", background: "#22c55e22", borderRadius: "3px", color: "#22c55e" }, children: t }, t))) })] }), SP_JSX.jsx(DFL.ButtonItem, { layout: "inline", onClick: () => doLibraryInstall(m.name), disabled: busy, description: `Instalar ${m.name}`, children: "Instalar" })] }) }, m.name)))) : (SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsx("div", { style: { color: "#8b8b8b", fontSize: "12px", textAlign: "center", padding: "16px" }, children: "Nenhum modelo encontrado. Tente ajustar a pesquisa." }) })) })), SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsx("div", { style: { color: "#8b8b8b", fontSize: "11px", marginTop: "8px" }, children: "N\u00E3o encontrou? Use \"Instalar modelo\" acima para instalar por tag exata (ex: llama3.2:7b)." }) })] })), status.service_active && (SP_JSX.jsxs(DFL.PanelSection, { title: "Configura\u00E7\u00E3o RAG", children: [SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsx("div", { style: { color: "#8b8b8b", fontSize: "12px", marginBottom: "8px" }, children: "Diret\u00F3rio de documentos para RAG (Retrieval-Augmented Generation)" }) }), SP_JSX.jsxs(DFL.PanelSectionRow, { children: [SP_JSX.jsx("input", { type: "text", value: ragDirInput, onChange: (e) => setRagDirInput(e.target.value), placeholder: "~/Documents/ollama-rag", style: {
+                            }) }) }), libraryLoading ? (SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsx("div", { style: { color: "#8b8b8b", fontSize: "12px", textAlign: "center", padding: "16px" }, children: "A pesquisar\u2026" }) })) : (SP_JSX.jsx(SP_JSX.Fragment, { children: libraryResults.length > 0 ? (libraryResults.map((m) => (SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsxs("div", { style: { display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "8px" }, children: [SP_JSX.jsxs("div", { children: [SP_JSX.jsx("div", { style: { color: "#e6e6e6", fontWeight: 500 }, children: m.name }), SP_JSX.jsx("div", { style: { color: "#8b8b8b", fontSize: "11px" }, children: m.description }), SP_JSX.jsx("div", { style: { display: "flex", gap: "4px", marginTop: "4px" }, children: m.tags.map((t) => (SP_JSX.jsx("span", { style: { fontSize: "10px", padding: "2px 6px", background: "#22c55e22", borderRadius: "3px", color: "#22c55e" }, children: t }, t))) })] }), SP_JSX.jsx(DFL.ButtonItem, { layout: "inline", onClick: () => doLibraryInstall(m.name), disabled: busy, description: `Instalar ${m.name}`, children: "Instalar" })] }) }, m.name)))) : (SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsx("div", { style: { color: "#8b8b8b", fontSize: "12px", textAlign: "center", padding: "16px" }, children: "Nenhum modelo encontrado. Tente ajustar a pesquisa." }) })) })), SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsx("div", { style: { color: "#8b8b8b", fontSize: "11px", marginTop: "8px" }, children: "N\u00E3o encontrou? Use \"Instalar modelo\" acima para instalar por tag exata (ex: llama3.2:7b)." }) })] })), status.service_active && (SP_JSX.jsxs(DFL.PanelSection, { title: "Configura\u00E7\u00E3o RAG", children: [SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsx("div", { style: { color: "#8b8b8b", fontSize: "12px", marginBottom: "8px" }, children: "Diret\u00F3rio de documentos para RAG (Retrieval-Augmented Generation)" }) }), SP_JSX.jsxs(DFL.PanelSectionRow, { children: [SP_JSX.jsx("input", { type: "text", value: ragDirInput, onChange: (e) => setRagDirInput(e.target.value), placeholder: "~/Documents/ollama-rag", style: {
                                     flex: 1,
                                     padding: "8px",
                                     borderRadius: "4px",
@@ -541,7 +492,81 @@ function Content() {
                                     background: "#1a1a1a",
                                     color: "#fafafa",
                                     fontSize: "14px",
-                                } }), SP_JSX.jsx(DFL.ButtonItem, { layout: "inline", onClick: doRagDirSave, disabled: busy, children: "Salvar" })] }), ragConfig && (SP_JSX.jsxs(SP_JSX.Fragment, { children: [SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsxs("div", { style: { color: "#8b8b8b", fontSize: "11px" }, children: ["Diret\u00F3rio atual: ", ragConfig.rag_documents_dir || "não definido"] }) }), SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsx("div", { style: { color: "#8b8b8b", fontSize: "12px", marginBottom: "8px", marginTop: "8px" }, children: "Modelo de Embedding" }) }), ragConfig.installed_embedding_models.length > 0 ? (SP_JSX.jsxs(SP_JSX.Fragment, { children: [SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsxs("div", { style: { color: "#e6e6e6", fontSize: "12px", marginBottom: "4px" }, children: ["Instalados: ", ragConfig.installed_embedding_models.join(", ")] }) }), ragConfig.rag_embedding_model ? (SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsxs("div", { style: { display: "flex", gap: "8px", alignItems: "center" }, children: [SP_JSX.jsxs("span", { style: { color: "#e6e6e6" }, children: ["Ativo: ", ragConfig.rag_embedding_model] }), ragConfig.installed_embedding_models.filter((m) => m !== ragConfig.rag_embedding_model).map((m) => (SP_JSX.jsxs(DFL.ButtonItem, { layout: "inline", onClick: () => doRagModelSet(m), disabled: busy, children: ["Usar ", m] }, m)))] }) })) : (SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsx("div", { style: { display: "flex", gap: "8px" }, children: ragConfig.installed_embedding_models.map((m) => (SP_JSX.jsxs(DFL.ButtonItem, { layout: "inline", onClick: () => doRagModelSet(m), disabled: busy, children: ["Usar ", m] }, m))) }) }))] })) : (SP_JSX.jsxs(SP_JSX.Fragment, { children: [SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsx("div", { style: { color: "#f43f5e", fontSize: "11px", padding: "8px", background: "#f43f5e11", borderRadius: "4px", border: "1px solid #f43f5e33" }, children: "Nenhum modelo de embedding instalado. RAG requer um modelo de embedding." }) }), ragConfig.recommended_embedding_model && (SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsx(DFL.ButtonItem, { layout: "inline", onClick: doRagModelInstall, disabled: busy || ragModelInstalling, children: ragModelInstalling ? "A instalar…" : `Instalar recomendado ({ragConfig.recommended_embedding_model})` }) }))] }))] }))] }))] }));
+                                } }), SP_JSX.jsx(DFL.ButtonItem, { layout: "inline", onClick: doRagDirSave, disabled: busy, children: "Salvar" })] }), ragConfig && (SP_JSX.jsxs(SP_JSX.Fragment, { children: [SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsxs("div", { style: { color: "#8b8b8b", fontSize: "11px", marginBottom: "8px" }, children: ["Diret\u00F3rio atual: ", ragConfig.rag_documents_dir || "não definido"] }) }), SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsx("div", { style: { color: "#8b8b8b", fontSize: "12px", marginBottom: "8px", marginTop: "8px" }, children: "Modelo de Embedding" }) }), ragConfig.installed_embedding_models.length > 0 ? (SP_JSX.jsxs(SP_JSX.Fragment, { children: [SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsxs("div", { style: { color: "#e6e6e6", fontSize: "12px", marginBottom: "4px" }, children: ["Instalados: ", ragConfig.installed_embedding_models.join(", ")] }) }), ragConfig.rag_embedding_model ? (SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsxs("div", { style: { display: "flex", gap: "8px", alignItems: "center", marginBottom: "8px" }, children: [SP_JSX.jsxs("span", { style: { color: "#e6e6e6" }, children: ["Ativo: ", ragConfig.rag_embedding_model] }), ragConfig.installed_embedding_models.filter((m) => m !== ragConfig.rag_embedding_model).map((m) => (SP_JSX.jsxs(DFL.ButtonItem, { layout: "inline", onClick: () => doRagModelSet(m), disabled: busy, children: ["Usar ", m] }, m)))] }) })) : (SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsx("div", { style: { display: "flex", gap: "8px", marginBottom: "8px" }, children: ragConfig.installed_embedding_models.map((m) => (SP_JSX.jsxs(DFL.ButtonItem, { layout: "inline", onClick: () => doRagModelSet(m), disabled: busy, children: ["Usar ", m] }, m))) }) }))] })) : (SP_JSX.jsxs(SP_JSX.Fragment, { children: [SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsx("div", { style: { color: "#f43f5e", fontSize: "11px", padding: "8px", background: "#f43f5e11", borderRadius: "4px", border: "1px solid #f43f5e33", marginBottom: "8px" }, children: "Nenhum modelo de embedding instalado. RAG requer um modelo de embedding." }) }), ragConfig.recommended_embedding_model && (SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsx(DFL.ButtonItem, { layout: "inline", onClick: doRagModelInstall, disabled: busy || ragModelInstalling, children: ragModelInstalling ? "A instalar…" : `Instalar recomendado ({ragConfig.recommended_embedding_model})` }) }))] }))] }))] }))] }));
+}
+function ChatModal({ models, initialModel }) {
+    const [chatMessages, setChatMessages] = SP_REACT.useState([]);
+    const [chatInput, setChatInput] = SP_REACT.useState("");
+    const [chatModel, setChatModel] = SP_REACT.useState(initialModel);
+    const [chatBusy, setChatBusy] = SP_REACT.useState(false);
+    const messagesEndRef = SP_REACT.useRef(null);
+    const scrollToBottom = () => {
+        messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+    };
+    SP_REACT.useEffect(() => {
+        scrollToBottom();
+    }, [chatMessages]);
+    const handleSend = async () => {
+        if (!chatInput.trim() || !chatModel || chatBusy)
+            return;
+        const prompt = chatInput.trim();
+        setChatInput("");
+        setChatBusy(true);
+        setChatMessages((prev) => [...prev, { role: "user", content: prompt }]);
+        try {
+            const res = await chat(chatModel, prompt);
+            if (!res.ok) {
+                toaster.toast({
+                    title: "Chat falhou",
+                    body: res.error || "Erro desconhecido",
+                    critical: true,
+                });
+                setChatMessages((prev) => [...prev, { role: "assistant", content: `Erro: ${res.error}` }]);
+            }
+            else {
+                setChatMessages((prev) => [...prev, { role: "assistant", content: res.response || "" }]);
+            }
+        }
+        catch (err) {
+            toaster.toast({
+                title: "Chat falhou",
+                body: String(err),
+                critical: true,
+            });
+            setChatMessages((prev) => [...prev, { role: "assistant", content: `Erro: ${err}` }]);
+        }
+        finally {
+            setChatBusy(false);
+        }
+    };
+    return (SP_JSX.jsxs("div", { style: { display: "flex", flexDirection: "column", height: "100%", minHeight: "500px" }, children: [SP_JSX.jsx("div", { style: { padding: "12px 16px", borderBottom: "1px solid #4a4a4a", background: "#1a1a1a" }, children: SP_JSX.jsx("select", { value: chatModel, onChange: (e) => setChatModel(e.target.value), disabled: chatBusy, style: {
+                        width: "100%",
+                        padding: "10px",
+                        borderRadius: "6px",
+                        border: "1px solid #4a4a4a",
+                        background: "#1a1a1a",
+                        color: "#fafafa",
+                        fontSize: "16px",
+                    }, children: models.map((m) => (SP_JSX.jsx("option", { value: m.name, children: m.name }, m.name))) }) }), SP_JSX.jsxs("div", { style: {
+                    flex: 1,
+                    overflowY: "auto",
+                    padding: "16px",
+                    background: "#0a0a0a",
+                }, children: [chatMessages.map((msg, idx) => (SP_JSX.jsxs("div", { style: {
+                            marginBottom: "16px",
+                            padding: "12px",
+                            borderRadius: "8px",
+                            background: msg.role === "user" ? "#22c55e22" : "#1a1a1a",
+                            border: msg.role === "user" ? "1px solid #22c55e44" : "1px solid #4a4a4a",
+                        }, children: [SP_JSX.jsx("div", { style: { fontSize: "12px", color: "#8b8b8b", marginBottom: "8px", fontWeight: 500 }, children: msg.role === "user" ? "Você" : "Ollama" }), SP_JSX.jsx("div", { style: { color: "#fafafa", whiteSpace: "pre-wrap", wordBreak: "break-word", lineHeight: "1.5", fontSize: "15px" }, children: msg.content })] }, idx))), chatBusy && (SP_JSX.jsx("div", { style: { padding: "12px", color: "#22c55e", fontStyle: "italic" }, children: "Ollama a pensar\u2026" })), SP_JSX.jsx("div", { ref: messagesEndRef })] }), SP_JSX.jsx("div", { style: { padding: "16px", borderTop: "1px solid #4a4a4a", background: "#1a1a1a" }, children: SP_JSX.jsxs("div", { style: { display: "flex", gap: "12px" }, children: [SP_JSX.jsx("input", { type: "text", value: chatInput, onChange: (e) => setChatInput(e.target.value), onKeyDown: (e) => e.key === "Enter" && !chatBusy && handleSend(), placeholder: "Digite a sua pergunta\u2026", disabled: chatBusy || !chatModel, autoFocus: true, style: {
+                                flex: 1,
+                                padding: "14px",
+                                borderRadius: "8px",
+                                border: "1px solid #4a4a4a",
+                                background: "#0a0a0a",
+                                color: "#fafafa",
+                                fontSize: "16px",
+                            } }), SP_JSX.jsx(DFL.ButtonItem, { layout: "inline", onClick: handleSend, disabled: chatBusy || !chatInput.trim() || !chatModel, children: "Enviar" })] }) })] }));
 }
 var index = definePlugin(() => ({
     name: "Ollama Deck",
