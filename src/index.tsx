@@ -8,7 +8,8 @@ import {
 } from "@decky/ui";
 import { callable, definePlugin, toaster } from "@decky/api";
 import { useEffect, useState, useRef } from "react";
-import { FaRobot, FaDownload } from "react-icons/fa";
+import { FaRobot, FaDownload, FaTrash } from "react-icons/fa";
+import { t } from "./i18n";
 
 type ModelInfo = {
   name: string;
@@ -189,19 +190,19 @@ function Content() {
       const res = await pullModel(tag);
       if (!res.ok) {
         toaster.toast({
-          title: "Pull falhou",
-          body: res.error || `Não foi possível instalar ${tag}`,
+          title: t('toast.pull.failed'),
+          body: res.error || t('toast.pull.error', { model: tag }),
           critical: true,
         });
       } else {
         toaster.toast({
-          title: "Modelo instalado",
+          title: t('toast.model.installed'),
           body: tag,
         });
       }
     } catch (err) {
       toaster.toast({
-        title: "Pull falhou",
+        title: t('toast.pull.failed'),
         body: String(err),
         critical: true,
       });
@@ -218,19 +219,19 @@ function Content() {
       const res = await deleteModel(tag);
       if (!res.ok) {
         toaster.toast({
-          title: "Remoção falhou",
-          body: res.error || `Não foi possível remover ${tag}`,
+          title: t('toast.delete.failed'),
+          body: res.error || t('toast.delete.error', { model: tag }),
           critical: true,
         });
       } else {
         toaster.toast({
-          title: "Modelo removido",
+          title: t('toast.model.removed'),
           body: tag,
         });
       }
     } catch (err) {
       toaster.toast({
-        title: "Remoção falhou",
+        title: t('toast.delete.failed'),
         body: String(err),
         critical: true,
       });
@@ -260,7 +261,7 @@ function Content() {
       />,
       undefined,
       {
-        strTitle: "Chat Ollama",
+        strTitle: t('chat.modal.title'),
         bForcePopOut: true,
         bHideActionIcons: false,
         bHideMainWindowForPopouts: false,
@@ -312,20 +313,20 @@ function Content() {
       const res = await pullModel(modelName);
       if (!res.ok) {
         toaster.toast({
-          title: "Instalação falhou",
-          body: res.error || `Não foi possível instalar ${modelName}`,
+          title: t('toast.install.failed'),
+          body: res.error || t('toast.install.error', { model: modelName }),
           critical: true,
         });
       } else {
         toaster.toast({
-          title: "Modelo instalado",
+          title: t('toast.model.installed'),
           body: modelName,
         });
         await loadLibrarySearch();
       }
     } catch (err) {
       toaster.toast({
-        title: "Instalação falhou",
+        title: t('toast.install.failed'),
         body: String(err),
         critical: true,
       });
@@ -341,16 +342,16 @@ function Content() {
       const res = await setRagConfig(ragDirInput.trim() || undefined, undefined);
       if (!res.ok) {
         toaster.toast({
-          title: "Falha ao salvar",
-          body: res.error || "Erro desconhecido",
+          title: t('toast.save.failed'),
+          body: res.error || t('toast.save.error'),
           critical: true,
         });
       } else {
-        toaster.toast({ title: "Diretório RAG salvo", body: res.rag_documents_dir });
+        toaster.toast({ title: t('toast.rag.dir.saved'), body: res.rag_documents_dir });
         setRagConfigState(res);
       }
     } catch (err) {
-      toaster.toast({ title: "Falha ao salvar", body: String(err), critical: true });
+      toaster.toast({ title: t('toast.save.failed'), body: String(err), critical: true });
     } finally {
       setBusy(false);
     }
@@ -364,13 +365,13 @@ function Content() {
       const model = ragConfig.recommended_embedding_model;
       const res = await pullModel(model);
       if (!res.ok) {
-        toaster.toast({ title: "Instalação falhou", body: res.error || "Erro", critical: true });
+        toaster.toast({ title: t('toast.rag.install.failed'), body: res.error || t('toast.rag.install.error'), critical: true });
       } else {
-        toaster.toast({ title: "Modelo de embedding instalado", body: model });
+        toaster.toast({ title: t('toast.rag.embedding.installed'), body: model });
         await loadRagConfig();
       }
     } catch (err) {
-      toaster.toast({ title: "Instalação falhou", body: String(err), critical: true });
+      toaster.toast({ title: t('toast.rag.install.failed'), body: String(err), critical: true });
     } finally {
       setRagModelInstalling(false);
       setBusy(false);
@@ -382,13 +383,13 @@ function Content() {
     try {
       const res = await setRagConfig(undefined, model);
       if (!res.ok) {
-        toaster.toast({ title: "Falha ao definir", body: res.error || "Erro", critical: true });
+        toaster.toast({ title: t('toast.rag.set.failed'), body: res.error || t('toast.rag.set.failed'), critical: true });
       } else {
-        toaster.toast({ title: "Modelo de embedding definido", body: model });
+        toaster.toast({ title: t('toast.rag.embedding.set'), body: model });
         setRagConfigState(res);
       }
     } catch (err) {
-      toaster.toast({ title: "Falha ao definir", body: String(err), critical: true });
+      toaster.toast({ title: t('toast.rag.set.failed'), body: String(err), critical: true });
     } finally {
       setBusy(false);
     }
@@ -396,9 +397,9 @@ function Content() {
 
   if (!status) {
     return (
-      <PanelSection title="Ollama Deck">
+      <PanelSection title={t('app.title')}>
         <PanelSectionRow>
-          <div style={{ color: "#8b8b8b", padding: "8px 0" }}>Loading…</div>
+          <div style={{ color: "#8b8b8b", padding: "8px 0" }}>{t('app.loading')}</div>
         </PanelSectionRow>
       </PanelSection>
     );
@@ -407,10 +408,10 @@ function Content() {
   // Pull model modal
   if (pullModalOpen) {
     return (
-      <PanelSection title="Instalar modelo">
+      <PanelSection title={t('pull.modal.title')}>
         <PanelSectionRow>
           <div style={{ color: "#8b8b8b", fontSize: "12px", marginBottom: "8px" }}>
-            Nome do modelo (ex: llama3.2, mistral:7b, codellama:13b)
+            {t('pull.modal.hint')}
           </div>
         </PanelSectionRow>
         <PanelSectionRow>
@@ -418,7 +419,7 @@ function Content() {
             type="text"
             value={pullModelName}
             onChange={(e) => setPullModelName(e.target.value)}
-            placeholder="llama3.2"
+            placeholder={t('pull.modal.placeholder')}
             style={{
               width: "100%",
               padding: "8px",
@@ -438,14 +439,14 @@ function Content() {
               layout="inline"
               onClick={() => setPullModalOpen(false)}
             >
-              Cancelar
+              {t('pull.modal.btn.cancel')}
             </ButtonItem>
             <ButtonItem
               layout="inline"
               onClick={doPull}
               disabled={busy || !pullModelName.trim()}
             >
-              Instalar
+              {t('pull.modal.btn.install')}
             </ButtonItem>
           </div>
         </PanelSectionRow>
@@ -459,21 +460,21 @@ function Content() {
     try {
       res = await updateAll();
       const o = res.ollama;
-      const body =
+      const ollamaBody =
         o.before && o.after && o.before !== o.after
-          ? `Ollama ${o.before} -> ${o.after}`
-          : `Ollama ${o.after ?? "?"}`;
+          ? t('update.body.ollama', { before: o.before, after: o.after })
+          : t('update.body.ollama.single', { after: o.after ?? '?' });
       const okModels = res.models.filter((m) => m.ok).length;
       const failed = res.models.filter((m) => !m.ok);
       const modelSummary = res.models.length
-        ? `${okModels}/${res.models.length} modelos`
-        : "sem modelos para atualizar";
+        ? t('update.body.models', { ok: okModels, total: res.models.length })
+        : t('update.body.models.none');
       toaster.toast({
-        title: res.ok ? "Update concluído" : "Update com falhas",
+        title: res.ok ? t('toast.update.complete') : t('toast.update.partial'),
         body:
-          `${body} · ${modelSummary}` +
+          `${ollamaBody} · ${modelSummary}` +
           (failed.length
-            ? ` · falhou: ${failed.map((m) => m.model).join(", ")}`
+            ? ` · ${t('update.body.failed', { models: failed.map((m) => m.model).join(", ") })}`
             : ""),
         critical: !res.ok,
         duration: 8000
@@ -481,7 +482,7 @@ function Content() {
     } catch (err) {
       console.error("update_all failed", err);
       toaster.toast({
-        title: "Update falhou",
+        title: t('toast.update.failed'),
         body: String(err),
         critical: true
       });
@@ -492,7 +493,7 @@ function Content() {
   };
 
   return (
-    <PanelSection title="Ollama Deck">
+    <PanelSection title={t('app.title')}>
       <PanelSectionRow>
         <div style={{ display: "flex", alignItems: "center", color: "#e6e6e6", marginBottom: "8px" }}>
           <StatusDot ok={status.service_active && status.api_reachable} />
@@ -509,11 +510,11 @@ function Content() {
 
       <PanelSectionRow>
         <ToggleField
-          label="Ollama Service"
+          label={t('service.label')}
           description={
             status.service_active
-              ? "Serviço ativo (start). Desliga on demand."
-              : "Serviço parado. Liga on demand."
+              ? t('service.desc.active')
+              : t('service.desc.inactive')
           }
           checked={status.service_active}
           disabled={busy}
@@ -524,20 +525,20 @@ function Content() {
       {status.keep_awake_locked ? (
 <PanelSectionRow>
         <div style={{ color: "#8b8b8b", fontSize: "12px", padding: "4px 0", marginBottom: "8px" }}>
-          O Deck não suspende enquanto o serviço estiver ativo.
+          {t('keepAwake.locked')}
         </div>
       </PanelSectionRow>
       ) : null}
 
       <PanelSectionRow>
         <ToggleField
-          label="Keep Deck Awake"
+          label={t('keepAwake.label')}
           description={
             status.service_active
               ? status.keep_awake_locked
-                ? "Suspensão bloqueada durante inferências."
-                : "Ativar para impedir a suspensão do Deck."
-              : "Eficaz enquanto o serviço estiver ativo."
+                ? t('keepAwake.desc.locked')
+                : t('keepAwake.desc.active')
+              : t('keepAwake.desc.inactive')
           }
           checked={status.keep_awake}
           disabled={busy}
@@ -547,11 +548,11 @@ function Content() {
 
       <PanelSectionRow>
         <ToggleField
-          label="Start with Steam Deck"
+          label={t('autostart.label')}
           description={
             status.autostart
-              ? "O serviço arranca com a sessão do utilizador."
-              : "O serviço arranca apenas por pedido."
+              ? t('autostart.desc.active')
+              : t('autostart.desc.inactive')
           }
           checked={status.autostart}
           disabled={busy}
@@ -562,12 +563,12 @@ function Content() {
       {status.api_url && status.service_active ? (
         <PanelSectionRow>
           <div style={{ color: "#8b8b8b", fontSize: "12px", marginBottom: "8px" }}>
-            API: {status.api_url}
+            {t('api.url', { url: status.api_url })}
           </div>
         </PanelSectionRow>
       ) : null}
 
-<PanelSection title="Updates">
+<PanelSection title={t('updates.title')}>
         <PanelSectionRow>
           <ButtonItem
             layout="below"
@@ -575,12 +576,12 @@ function Content() {
             onClick={doUpdate}
             description={
               status.service_active
-                ? "Atualiza o binário e faz pull dos modelos instalados."
-                : "Atualiza o binário; os modelos listados serão puxados."
+                ? t('updates.btn.update.desc.active')
+                : t('updates.btn.update.desc.inactive')
             }
           >
             <FaDownload style={{ marginRight: "8px", verticalAlign: "middle" }} />
-            Update Ollama & models
+            {t('updates.btn.update')}
           </ButtonItem>
         </PanelSectionRow>
         <PanelSectionRow>
@@ -588,17 +589,17 @@ function Content() {
             layout="below"
             disabled={busy || !status.service_active}
             onClick={() => setPullModalOpen(true)}
-            description="Instala um novo modelo (ex: llama3.2, mistral:7b). Requer serviço ativo."
+            description={t('updates.btn.install.desc')}
           >
             <FaDownload style={{ marginRight: "8px", verticalAlign: "middle" }} />
-            Instalar modelo
+            {t('updates.btn.install')}
           </ButtonItem>
         </PanelSectionRow>
         <PanelSectionRow>
           <div style={{ color: "#8b8b8b", fontSize: "12px" }}>
             {busy
-              ? "A atualizar… a inferência fica em pausa."
-              : `Versão atual: ${status.version ?? "—"}. Modelos: ${status.models.length}.`}
+              ? t('updates.status.updating')
+              : t('updates.status.idle', { version: status.version ?? "—", count: status.models.length })}
           </div>
         </PanelSectionRow>
       </PanelSection>
@@ -610,20 +611,20 @@ function Content() {
               layout="below"
               disabled={busy}
               onClick={openChatModal}
-              description="Abre o chat em janela completa para melhor conforto."
+              description={t('chat.btn.open.desc')}
             >
               <FaRobot style={{ marginRight: "8px", verticalAlign: "middle" }} />
-              Abrir Chat
+              {t('chat.btn.open')}
             </ButtonItem>
           </div>
         </PanelSectionRow>
       ) : null}
 
       {status.service_active ? (
-        <PanelSection title="Conexão LAN">
+        <PanelSection title={t('lan.title')}>
           <PanelSectionRow>
             <div style={{ color: "#8b8b8b", fontSize: "12px", marginBottom: "8px" }}>
-              Informação para ligar a partir de outros equipamentos na rede:
+              {t('lan.desc')}
             </div>
           </PanelSectionRow>
           {lanInfoData ? (
@@ -637,17 +638,17 @@ function Content() {
               )}
               <PanelSectionRow>
                 <div style={{ color: "#e6e6e6", fontSize: "12px", marginBottom: "8px" }}>
-                  <strong>Endereço:</strong> {lanInfoData.base_url}
+                  <strong>{t('lan.address', { url: lanInfoData.base_url ?? '' })}</strong>
                 </div>
               </PanelSectionRow>
               <PanelSectionRow>
                 <div style={{ color: "#8b8b8b", fontSize: "11px", marginBottom: "8px" }}>
-                  Modelos disponíveis: {lanInfoData.models?.join(", ") || "nenhum"}
+                  {t('lan.models', { models: lanInfoData.models?.join(", ") || 'none' })}
                 </div>
               </PanelSectionRow>
               <PanelSectionRow>
                 <div style={{ color: "#8b8b8b", fontSize: "11px", marginBottom: "8px" }}>
-                  Exemplos de uso:
+                  {t('lan.examples')}
                 </div>
               </PanelSectionRow>
               {lanInfoData.examples && Object.entries(lanInfoData.examples).map(([lang, cmd]) => (
@@ -657,7 +658,7 @@ function Content() {
                       {cmd}
                     </code>
                     <ButtonItem layout="inline" onClick={() => navigator.clipboard.writeText(cmd)} disabled={busy}>
-                      Copiar
+                      {t('lan.btn.copy')}
                     </ButtonItem>
                   </div>
                 </PanelSectionRow>
@@ -665,14 +666,14 @@ function Content() {
             </>
           ) : (
             <PanelSectionRow>
-              <div style={{ color: "#8b8b8b", fontSize: "12px" }}>A carregar informação LAN…</div>
+              <div style={{ color: "#8b8b8b", fontSize: "12px", marginBottom: "8px" }}>{t('lan.loading')}</div>
             </PanelSectionRow>
           )}
         </PanelSection>
       ) : null}
 
       {status.models.length > 0 ? (
-        <PanelSection title="Models">
+        <PanelSection title={t('models.title')}>
           {status.models.map((m) => (
             <PanelSectionRow key={m.name}>
               <div
@@ -692,9 +693,9 @@ function Content() {
                     layout="inline"
                     disabled={busy || deleteConfirm === m.name}
                     onClick={() => setDeleteConfirm(m.name)}
-                    description="Remove este modelo permanentemente"
+                    description={t('delete.desc')}
                   >
-                    🗑
+                    <FaTrash style={{ marginRight: "4px", verticalAlign: "middle" }} />
                   </ButtonItem>
                 </div>
               </div>
@@ -705,13 +706,13 @@ function Content() {
                       layout="inline"
                       onClick={() => setDeleteConfirm(null)}
                     >
-                      Cancelar
+                      {t('delete.btn.cancel')}
                     </ButtonItem>
                     <ButtonItem
                       layout="inline"
                       onClick={() => doDelete(m.name)}
                     >
-                      Confirmar remoção
+                      {t('delete.btn.confirm')}
                     </ButtonItem>
                   </div>
                 </PanelSectionRow>
@@ -722,7 +723,7 @@ function Content() {
       ) : (
         <PanelSectionRow>
           <div style={{ color: "#8b8b8b", fontSize: "12px", marginBottom: "8px" }}>
-            Nenhum modelo — liga o serviço para listar.
+            {t('models.empty')}
           </div>
         </PanelSectionRow>
       )}
@@ -734,10 +735,10 @@ function Content() {
       ) : null}
 
       {status.service_active && (
-        <PanelSection title="Biblioteca de Modelos">
+        <PanelSection title={t('library.title')}>
           <PanelSectionRow>
             <div style={{ color: "#8b8b8b", fontSize: "12px", marginBottom: "8px" }}>
-              Pesquisar e instalar modelos da biblioteca Ollama
+              {t('library.desc')}
             </div>
           </PanelSectionRow>
           <PanelSectionRow>
@@ -745,7 +746,7 @@ function Content() {
               type="text"
               value={librarySearch}
               onChange={(e) => setLibrarySearch(e.target.value)}
-              placeholder="Pesquisar por nome ou descrição…"
+              placeholder={t('library.search.placeholder')}
               style={{
                 width: "100%",
                 padding: "8px",
@@ -762,6 +763,7 @@ function Content() {
             <div style={{ display: "flex", gap: "4px", flexWrap: "wrap", marginBottom: "8px" }}>
               {["all", "chat", "code", "embedding", "vision", "tools"].map((tag) => {
                 const isActive = tag === "all" ? libraryTags.length === 0 : libraryTags.includes(tag);
+                const tagKey = `library.tags.${tag}` as string;
                 return (
                   <button
                     key={tag}
@@ -784,7 +786,7 @@ function Content() {
                       cursor: "pointer",
                     }}
                   >
-                    {tag === "all" ? "Todos" : tag.charAt(0).toUpperCase() + tag.slice(1)}
+                    {t(tagKey)}
                   </button>
                 );
               })}
@@ -793,7 +795,7 @@ function Content() {
           {libraryLoading ? (
             <PanelSectionRow>
               <div style={{ color: "#8b8b8b", fontSize: "12px", textAlign: "center", padding: "16px" }}>
-                A pesquisar…
+                {t('library.loading')}
               </div>
             </PanelSectionRow>
           ) : (
@@ -819,9 +821,9 @@ function Content() {
                         layout="inline"
                         onClick={() => doLibraryInstall(m.name)}
                         disabled={busy}
-                        description={`Instalar ${m.name}`}
+                        description={t('library.btn.install.desc', { name: m.name })}
                       >
-                        Instalar
+                        {t('library.btn.install')}
                       </ButtonItem>
                     </div>
                   </PanelSectionRow>
@@ -829,7 +831,7 @@ function Content() {
               ) : (
                 <PanelSectionRow>
                   <div style={{ color: "#8b8b8b", fontSize: "12px", textAlign: "center", padding: "16px" }}>
-                    Nenhum modelo encontrado. Tente ajustar a pesquisa.
+                    {t('library.empty')}
                   </div>
                 </PanelSectionRow>
               )}
@@ -837,17 +839,17 @@ function Content() {
           )}
           <PanelSectionRow>
             <div style={{ color: "#8b8b8b", fontSize: "11px", marginTop: "8px" }}>
-              Não encontrou? Use "Instalar modelo" acima para instalar por tag exata (ex: llama3.2:7b).
+              {t('library.hint')}
             </div>
           </PanelSectionRow>
         </PanelSection>
       )}
 
       {status.service_active && (
-        <PanelSection title="Configuração RAG">
+        <PanelSection title={t('rag.title')}>
           <PanelSectionRow>
             <div style={{ color: "#8b8b8b", fontSize: "12px", marginBottom: "8px" }}>
-              Diretório de documentos para RAG (Retrieval-Augmented Generation)
+              {t('rag.desc')}
             </div>
           </PanelSectionRow>
           <PanelSectionRow>
@@ -855,7 +857,7 @@ function Content() {
               type="text"
               value={ragDirInput}
               onChange={(e) => setRagDirInput(e.target.value)}
-              placeholder="~/Documents/ollama-rag"
+              placeholder={t('rag.dir.placeholder')}
               style={{
                 flex: 1,
                 padding: "8px",
@@ -867,32 +869,32 @@ function Content() {
               }}
             />
             <ButtonItem layout="inline" onClick={doRagDirSave} disabled={busy}>
-              Salvar
+              {t('rag.btn.save')}
             </ButtonItem>
           </PanelSectionRow>
           {ragConfig && (
             <>
               <PanelSectionRow>
                 <div style={{ color: "#8b8b8b", fontSize: "11px", marginBottom: "8px" }}>
-                  Diretório atual: {ragConfig.rag_documents_dir || "não definido"}
+                  {t('rag.current', { dir: ragConfig.rag_documents_dir || 'not defined' })}
                 </div>
               </PanelSectionRow>
               <PanelSectionRow>
                 <div style={{ color: "#8b8b8b", fontSize: "12px", marginBottom: "8px", marginTop: "8px" }}>
-                  Modelo de Embedding
+                  {t('rag.embedding.title')}
                 </div>
               </PanelSectionRow>
               {ragConfig.installed_embedding_models.length > 0 ? (
                 <>
                   <PanelSectionRow>
                     <div style={{ color: "#e6e6e6", fontSize: "12px", marginBottom: "4px" }}>
-                      Instalados: {ragConfig.installed_embedding_models.join(", ")}
+                      {t('rag.embedding.installed', { models: ragConfig.installed_embedding_models.join(", ") })}
                     </div>
                   </PanelSectionRow>
                   {ragConfig.rag_embedding_model ? (
                     <PanelSectionRow>
                       <div style={{ display: "flex", gap: "8px", alignItems: "center", marginBottom: "8px" }}>
-                        <span style={{ color: "#e6e6e6" }}>Ativo: {ragConfig.rag_embedding_model}</span>
+                        <span style={{ color: "#e6e6e6" }}>{t('rag.embedding.active', { model: ragConfig.rag_embedding_model })}</span>
                         {ragConfig.installed_embedding_models.filter((m) => m !== ragConfig.rag_embedding_model).map((m) => (
                           <ButtonItem
                             key={m}
@@ -900,7 +902,7 @@ function Content() {
                             onClick={() => doRagModelSet(m)}
                             disabled={busy}
                           >
-                            Usar {m}
+                            {t('rag.embedding.btn.use', { model: m })}
                           </ButtonItem>
                         ))}
                       </div>
@@ -915,7 +917,7 @@ function Content() {
                             onClick={() => doRagModelSet(m)}
                             disabled={busy}
                           >
-                            Usar {m}
+                            {t('rag.embedding.btn.use', { model: m })}
                           </ButtonItem>
                         ))}
                       </div>
@@ -926,7 +928,7 @@ function Content() {
                 <>
                   <PanelSectionRow>
                     <div style={{ color: "#f43f5e", fontSize: "11px", padding: "8px", background: "#f43f5e11", borderRadius: "4px", border: "1px solid #f43f5e33", marginBottom: "8px" }}>
-                      Nenhum modelo de embedding instalado. RAG requer um modelo de embedding.
+                      {t('rag.embedding.none')}
                     </div>
                   </PanelSectionRow>
                   {ragConfig.recommended_embedding_model && (
@@ -936,7 +938,7 @@ function Content() {
                         onClick={doRagModelInstall}
                         disabled={busy || ragModelInstalling}
                       >
-                        {ragModelInstalling ? "A instalar…" : `Instalar recomendado ({ragConfig.recommended_embedding_model})`}
+                        {ragModelInstalling ? t('rag.embedding.installing') : t('rag.embedding.btn.install', { model: ragConfig.recommended_embedding_model })}
                       </ButtonItem>
                     </PanelSectionRow>
                   )}
@@ -981,21 +983,21 @@ function ChatModal({
       const res = await chat(chatModel, prompt);
       if (!res.ok) {
         toaster.toast({
-          title: "Chat falhou",
-          body: res.error || "Erro desconhecido",
+          title: t('chat.error.failed'),
+          body: res.error || t('chat.error.unknown'),
           critical: true,
         });
-        setChatMessages((prev) => [...prev, { role: "assistant", content: `Erro: ${res.error}` }]);
+        setChatMessages((prev) => [...prev, { role: "assistant", content: `${t('chat.role.assistant')}: ${res.error}` }]);
       } else {
         setChatMessages((prev) => [...prev, { role: "assistant", content: res.response || "" }]);
       }
     } catch (err) {
       toaster.toast({
-        title: "Chat falhou",
+        title: t('chat.error.failed'),
         body: String(err),
         critical: true,
       });
-      setChatMessages((prev) => [...prev, { role: "assistant", content: `Erro: ${err}` }]);
+      setChatMessages((prev) => [...prev, { role: "assistant", content: `${t('chat.role.assistant')}: ${err}` }]);
     } finally {
       setChatBusy(false);
     }
@@ -1045,7 +1047,7 @@ function ChatModal({
             }}
           >
             <div style={{ fontSize: "12px", color: "#8b8b8b", marginBottom: "8px", fontWeight: 500 }}>
-              {msg.role === "user" ? "Você" : "Ollama"}
+              {msg.role === "user" ? t('chat.role.user') : t('chat.role.assistant')}
             </div>
             <div style={{ color: "#fafafa", whiteSpace: "pre-wrap", wordBreak: "break-word", lineHeight: "1.5", fontSize: "15px" }}>
               {msg.content}
@@ -1054,7 +1056,7 @@ function ChatModal({
         ))}
         {chatBusy && (
           <div style={{ padding: "12px", color: "#22c55e", fontStyle: "italic" }}>
-            Ollama a pensar…
+            {t('chat.thinking')}
           </div>
         )}
         <div ref={messagesEndRef} />
@@ -1066,7 +1068,7 @@ function ChatModal({
             value={chatInput}
             onChange={(e) => setChatInput(e.target.value)}
             onKeyDown={(e) => e.key === "Enter" && !chatBusy && handleSend()}
-            placeholder="Digite a sua pergunta…"
+            placeholder={t('chat.input.placeholder')}
             disabled={chatBusy || !chatModel}
             autoFocus
             style={{
@@ -1080,7 +1082,7 @@ function ChatModal({
             }}
           />
           <ButtonItem layout="inline" onClick={handleSend} disabled={chatBusy || !chatInput.trim() || !chatModel}>
-            Enviar
+            {t('chat.btn.send')}
           </ButtonItem>
         </div>
       </div>
@@ -1089,11 +1091,11 @@ function ChatModal({
 }
 
 export default definePlugin(() => ({
-  name: "Ollama Deck",
+  name: t('app.title'),
   titleView: (
     <div className={staticClasses.Title}>
       <FaRobot style={{ marginRight: "8px", verticalAlign: "middle" }} />
-      Ollama Deck
+      {t('app.title')}
     </div>
   ),
   content: <Content />,
