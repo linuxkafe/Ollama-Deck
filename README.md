@@ -1,166 +1,184 @@
 # Ollama-Deck
 
-Plugin [Decky Loader](https://decky.xyz) que serve e controla o **Ollama** no
-Steam Deck com GPU (Vulkan/RADV).
+[Decky Loader](https://decky.xyz) plugin to serve and control **Ollama** on the
+Steam Deck with GPU (Vulkan/RADV).
 
-## Funcionalidades
+## Features
 
-- **Liga/desliga o serviço Ollama on demand** (`ollama.service` do utilizador).
-- **Keep Deck Awake** — impede o Steam Deck de suspender durante inferências
-  ou acesso remoto (`systemd-inhibit`), libertado automaticamente quando o
-  serviço é desligado.
-- **Start with Steam Deck** — regula o auto-arranque do serviço com a sessão.
-- **Painel de estado** — serviço ativo, versão do Ollama, URL da API
-  (incl. IP LAN para acesso remoto), reachability e lista de modelos instalados
-  (nome/tamanho/família).
-- **Chat com Ollama** — envia prompts e recebe respostas diretamente no overlay
-  do Decky (Gaming Mode), com seleção de modelo e histórico da sessão.
-- **Info de conexão LAN** — mostra endereço, porta e exemplos de uso (curl,
-  Python, JavaScript) para ligar a partir de outros equipamentos na rede.
-- **Update Ollama & models** — atualiza o binário do Ollama (download oficial,
-  sem sudo) e faz *pull* dos modelos instalados, tudo a partir do plugin.
+- **On-demand Ollama service** (`ollama.service` user unit).
+- **Keep Deck Awake** — prevents Steam Deck suspend during inference or remote
+  access via `systemd-inhibit`, auto-released when service stops.
+- **Start with Steam Deck** — toggles service auto-start with user session.
+- **Status panel** — service state, Ollama version, API URL (incl. LAN IP for
+  remote access), reachability, and installed models list (name/size/family).
+- **LAN exposure toggle** — switch bind address between `0.0.0.0` (LAN) and
+  `127.0.0.1` (local only) with live service restart.
+- **Chat with Ollama** — send prompts and receive responses directly in the
+  Decky overlay (Gaming Mode), with model selector, session history, and
+  full-screen modal.
+- **Web Search RAG** — enable web search (DuckDuckGo) as default RAG source
+  for chat; results are embedded as context.
+- **Persona configuration** — define name, system prompt, temperature, max
+  tokens, and model; applied to all chats.
+- **LAN connection info** — shows address, port, and usage examples (curl,
+  Python, JavaScript) for connecting from other devices on the network.
+- **Update Ollama & models** — updates the Ollama binary (official tarball,
+  no sudo) and pulls installed models, all from the plugin.
+- **Model Library** — search and install models from the Ollama library with
+  tag filters (chat, code, embedding, vision, tools).
+- **RAG configuration** — documents directory and embedding model management.
+- **Internationalization** — English (default) and Portuguese (auto when
+  system locale is `pt-*`).
+- **CLI** — `ollama-deck` command for SSH/headless control sharing the same
+  backend and settings.
 
-Em execução normal, o plugin corre **sem privilégios root** e **não modifica**
-a instalação do Ollama nem o seu unit file pré-existente. As atualizações são
-sempre explícitas (botão no plugin).
+In normal operation the plugin runs **without root privileges** and **does not
+modify** an existing Ollama installation or its pre-existing unit file.
+Updates are always explicit (button in the plugin).
 
-## Requisitos
+## Requirements
 
-- Steam Deck com Decky Loader instalado.
-- Ollama em `/home/deck/.local/share/ollama-bin/` (o instalador abaixo instala-o
-  automaticamente se estiver ausente). Na primeira execução, se o unit
-  `ollama.service` não existir, o plugin cria-o a partir de um template padrão
-  (Vulkan + `OLLAMA_HOST=0.0.0.0`).
+- Steam Deck with Decky Loader installed.
+- Ollama at `/home/deck/.local/share/ollama-bin/` (the installer below installs
+  it automatically if missing). On first run, if `ollama.service` does not
+  exist, the plugin creates it from a default template (Vulkan +
+  `OLLAMA_HOST=0.0.0.0`).
 
-## Instalação
+## Installation
 
-### Rápida (recomendado)
+### Quick (recommended)
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/linuxkafe/Ollama-Deck/main/install.sh | sh
 ```
 
-O instalador descarrega o plugin da `main`, instala-o em
-`/home/deck/homebrew/plugins/ollama-deck` (pede sudo apenas para essa pasta),
-instala o Ollama se faltar e reinicia o `plugin_loader`. Para forçar outra
+The installer downloads the plugin from `main`, installs it to
+`/home/deck/homebrew/plugins/ollama-deck` (sudo only for that directory),
+installs Ollama if absent, and restarts `plugin_loader`. To force a specific
 branch: `OLLAMA_DECK_BRANCH=v1.0.0 curl -fsSL ... | sh`.
 
 ### Manual
 
 ```bash
-# na máquina de desenvolvimento
+# on dev machine
 make build
-scp -r . deck@<IP_DO_DECK>:/tmp/ollama-deck
+scp -r . deck@<DECK_IP>:/tmp/ollama-deck
 
-# no Steam Deck (utilizador deck)
+# on Steam Deck (deck user)
 sudo rm -rf /home/deck/homebrew/plugins/ollama-deck
 sudo cp -r /tmp/ollama-deck /home/deck/homebrew/plugins/ollama-deck
 ```
 
-Depois recarrega o Decky (Definições > Reload) ou
-`sudo systemctl restart plugin_loader`.
+Then reload Decky (Settings > Reload) or `sudo systemctl restart plugin_loader`.
 
-### Atualizações
+### Updates
 
-- **Plugin**: volta a correr o instalador rápido (`curl | sh`); o(s) backup(s)
-  anterior(es) ficam em `ollama-deck.bak.<timestamp>`.
-- **Ollama + modelos**: no plugin, secção **Updates**, botão
-  *Update Ollama &amp; models* — stop do serviço, descarrega e extrai o tarball
-  oficial para `~/.local/share/ollama-bin`, arranca de novo e faz `ollama pull`
-  de cada modelo instalado (e de tags extra em `model_tags` no settings).
+- **Plugin**: re-run the quick installer (`curl | sh`); previous backup(s)
+  remain at `ollama-deck.bak.<timestamp>`.
+- **Ollama + models**: in the plugin, **Updates** section, button
+  *Update Ollama & models* — stops service, downloads and extracts the official
+  tarball to `~/.local/share/ollama-bin`, restarts, and runs `ollama pull` for
+  each installed model (plus extra tags from `model_tags` in settings).
 
-## Uso
+## Usage
 
-1. Abre o Decky (botão `…` / Quick Access > plugin).
-2. Em **Ollama Deck**:
-   - ativa **Ollama Service** para arrancar o servidor;
-   - ativa **Keep Deck Awake** para impedir a suspensão durante o trabalho;
-   - (opcional) ativa **Start with Steam Deck** para iniciar com a sessão.
-3. O painel mostra versão, URL da API e modelos instalados.
+1. Open Decky (`…` button / Quick Access > plugin).
+2. In **Ollama Deck**:
+   - enable **Ollama Service** to start the server;
+   - enable **Keep Deck Awake** to prevent suspend during work;
+   - enable **Expose on LAN** to allow LAN connections (binds to `0.0.0.0`);
+   - (optional) enable **Start with Steam Deck** for session auto-start.
+3. Panel shows version, API URL, and installed models.
+4. **Chat**: click **Open Chat** for full-screen modal with model selector,
+   web search toggle, and session history.
+5. **Persona**: configure name, system prompt, temperature, max tokens, model;
+   applies to all chats.
+6. **Model Library**: search/install models with tag filters.
 
-## Linha de comandos (SSH)
+## CLI (SSH)
 
-O instalador (curl|sh) coloca o comando `ollama-deck` em `~/.local/bin/`
-(mesmo backend do plugin — partilha as settings e o keep-awake com a UI):
+The installer places `ollama-deck` in `~/.local/bin/` (same backend as the
+plugin — shares settings and keep-awake with the UI):
 
 ```bash
-# se ~/.local/bin não estiver no PATH:
+# if ~/.local/bin not in PATH:
 export PATH="$HOME/.local/bin:$PATH"
 
-ollama-deck on            # liga o serviço Ollama
-ollama-deck off           # desliga o serviço
-ollama-deck status        # estado atual (humano)
-ollama-deck status --json # estado em JSON (para scripts)
-ollama-deck enable        # auto-arranque com a sessão
-ollama-deck disable       # sem auto-arranque
-ollama-deck awake         # alterna keep-deck-awake
-ollama-deck awake on      # bloqueia a suspensão (quando o serviço estiver ativo)
-ollama-deck awake off     # liberta o bloqueio
-ollama-deck update        # atualiza o Ollama + modelos instalados
-ollama-deck pull <model>  # faz pull/atualiza um modelo
-ollama-deck rm <model>    # remove um modelo instalado
-ollama-deck chat <prompt> # envia prompt ao Ollama (requer serviço ativo)
-ollama-deck lan-info      # mostra como ligar ao Ollama pela LAN
-ollama-deck lan-info --json # info LAN em JSON
+ollama-deck on            # start Ollama service
+ollama-deck off           # stop service
+ollama-deck status        # current state (human)
+ollama-deck status --json # state as JSON (for scripts)
+ollama-deck enable        # auto-start with session
+ollama-deck disable       # no auto-start
+ollama-deck awake         # toggle keep-deck-awake
+ollama-deck awake on      # block suspend (when service active)
+ollama-deck awake off     # release block
+ollama-deck update        # update Ollama + installed models
+ollama-deck pull <model>  # pull/update a model
+ollama-deck rm <model>    # remove an installed model
+ollama-deck chat <prompt> # send prompt to Ollama (requires active service)
+ollama-deck lan-info      # show LAN connection info
+ollama-deck lan-info --json # LAN info as JSON
 ```
 
-Exit codes: `0` sucesso, `1` erro de runtime, `2` uso incorreto. Deve correr
-como o utilizador `deck` (não como root). O `awake on` só bloqueia a suspensão
-enquanto o serviço estiver ativo; se for ativado com o serviço parado, fica
-registado e passa a bloquear quando o serviço arrancar.
+Exit codes: `0` success, `1` runtime error, `2` usage error. Must run as user
+`deck` (not root). `awake on` only blocks suspend while service is active; if
+enabled with service stopped, it registers and blocks when service starts.
 
 **Chat via CLI:**
 ```bash
-ollama-deck chat "Explica quantum computing em português"
-ollama-deck chat "Escreve um hello world em Rust" --model llama3.2
+ollama-deck chat "Explain quantum computing"
+ollama-deck chat "Write hello world in Rust" --model llama3.2
 ```
 
-**Info LAN via CLI:**
+**LAN info via CLI:**
 ```bash
 ollama-deck lan-info
-# Endereço base: http://10.0.0.128:11434
-# Porta: 11434
-# Modelos: llama3.2, mistral:7b
+# Base URL: http://10.0.0.128:11434
+# Port: 11434
+# Models: llama3.2, mistral:7b
 #
-# Exemplos:
+# Examples:
 #   [curl] curl -X POST http://10.0.0.128:11434/api/generate ...
 #   [python] import requests ...
 ```
 
-API remota (se `OLLAMA_HOST=0.0.0.0`): qualquer cliente na LAN pode usar
-`http://<IP_DO_DECK>:11434`.
+Remote API (when `OLLAMA_HOST=0.0.0.0`): any LAN client can use
+`http://<DECK_IP>:11434`.
 
-> Aviso de segurança: com `OLLAMA_HOST=0.0.0.0` a API fica exposta à LAN sem
-> autenticação. Para uso apenas local, define `OLLAMA_HOST=127.0.0.1` no unit.
+> Security notice: with `OLLAMA_HOST=0.0.0.0` the API is exposed on LAN without
+> authentication. For local-only use, set `OLLAMA_HOST=127.0.0.1` in the unit.
 
-## Desenvolvimento
+## Development
 
 ```bash
 make setup    # npm install
 make check    # typecheck (tsc), py_compile, pytest, rollup build
-make deploy   # scp para o Deck (imprime os comandos sudo finais)
+make deploy   # scp to Deck (prints final sudo commands)
 ```
 
-Smoke test do backend no Deck (sem Decky, restaura o estado original):
+Smoke test the backend on Deck (without Decky, restores original state):
 
 ```bash
 python3 scripts/smoke_test.py
 ```
 
-## Estrutura
+## Structure
 
 ```
 main.py            backend (systemctl, systemd-inhibit, update, API, settings)
 src/index.tsx      frontend React (@decky/ui)
-plugin.json        metadados Decky
-install.sh         instalador curl | sh
-cli.py             CLI (ollama-deck on|off|status|...) — mesmo backend
-dist/index.js      bundle compilado (commitado — o Decky carrega daqui)
-scripts/smoke_test.py   teste de integração no Deck
-tests/             testes unitários offline (main + cli)
+src/i18n.ts        i18n module (EN/PT, auto-detect)
+plugin.json        Decky metadata
+install.sh         curl | sh installer
+cli.py             CLI (ollama-deck on|off|status|...) — shared backend
+dist/index.js      compiled bundle (committed — Decky loads from here)
+scripts/smoke_test.py   integration test on Deck
+tests/             offline unit tests (main + cli)
 docs/              VISION, REQUIREMENTS, ROADMAP, DESIGN, CHECKLIST
+aes/               Ambrósio Engineering System project tracking
 ```
 
 ## License
 
-MIT — ver [LICENSE](LICENSE).
+MIT — see [LICENSE](LICENSE).
