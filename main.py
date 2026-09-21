@@ -88,7 +88,7 @@ After=network.target
 [Service]
 Type=exec
 Environment="LD_LIBRARY_PATH=/home/deck/.local/share/ollama-bin/lib/ollama"
-Environment="OLLAMA_VULKAN=1"
+Environment="OLLAMA_VULKAN=1 OLLAMA_IGPU_ENABLE=1
 Environment="OLLAMA_HOST=0.0.0.0"
 Environment="VULKAN_DEVICE_INDEX=0"
 Environment="PATH=/usr/local/sbin:/usr/local/bin:/usr/bin:/home/deck/.local/share/ollama-bin/bin"
