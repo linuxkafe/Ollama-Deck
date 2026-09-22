@@ -108,6 +108,13 @@ function ChatModal({
     resizeInput();
   }, [input]);
 
+  useEffect(() => {
+    // Focus the textarea after the popout mounts so the SteamOS on-screen keyboard appears
+    requestAnimationFrame(() => {
+      inputRef.current?.focus();
+    });
+  }, []);
+
   const handleSend = async () => {
     if (!input.trim() || !model || busy) return;
     const prompt = input.trim();
@@ -232,7 +239,6 @@ function ChatModal({
             }}
             placeholder={t("chat.input.placeholder")}
             disabled={busy || !model}
-            autoFocus
             rows={1}
             style={{
               width: "100%",

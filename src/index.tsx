@@ -3,14 +3,15 @@ import {
   PanelSectionRow,
   ToggleField,
   ButtonItem,
-  staticClasses
+  staticClasses,
+  Focusable
 } from "@decky/ui";
 import { callable, definePlugin, toaster } from "@decky/api";
 import { Fragment, useEffect, useState } from "react";
 import { FaRobot, FaDownload, FaTrash } from "react-icons/fa";
 import { t } from "./i18n";
 import { openChatModal } from "./components/ChatModal";
-import { Btn } from "./components/ui";
+import { FocusBtn } from "./components/ui";
 
 type ModelInfo = {
   name: string;
@@ -520,17 +521,17 @@ function Content() {
         </PanelSectionRow>
         <PanelSectionRow>
           <div style={{ display: "flex", gap: "8px", flexWrap: "wrap" }}>
-            <Btn
+            <FocusBtn
               onClick={() => setPullModalOpen(false)}
             >
               {t('pull.modal.btn.cancel')}
-            </Btn>
-            <Btn
+            </FocusBtn>
+            <FocusBtn
               onClick={doPull}
               disabled={busy || !pullModelName.trim()}
             >
               {t('pull.modal.btn.install')}
-            </Btn>
+            </FocusBtn>
           </div>
         </PanelSectionRow>
       </PanelSection>
@@ -676,7 +677,12 @@ function Content() {
       ) : null}
 
       {status.service_active ? (
-        <PanelSection title={t('lan.title')}>
+        <PanelSection>
+          <PanelSectionRow>
+            <Focusable noFocusRing style={{ padding: "8px 0" }}>
+              <strong>{t('lan.title')}</strong>
+            </Focusable>
+          </PanelSectionRow>
           <PanelSectionRow>
             <div style={{ color: "#8b8b8b", fontSize: "12px", marginBottom: "8px" }}>
               {t('lan.desc')}
@@ -715,9 +721,9 @@ function Content() {
                   </PanelSectionRow>
                   <PanelSectionRow>
                     <div style={{ marginBottom: "8px" }}>
-                      <Btn onClick={() => navigator.clipboard.writeText(cmd)} disabled={busy}>
+                      <FocusBtn onClick={() => navigator.clipboard.writeText(cmd)} disabled={busy}>
                         {t('lan.btn.copy')}
-                      </Btn>
+                      </FocusBtn>
                     </div>
                   </PanelSectionRow>
                 </Fragment>
@@ -753,28 +759,28 @@ function Content() {
               {deleteConfirm === m.name ? (
                 <PanelSectionRow>
                   <div style={{ display: "flex", gap: "8px", flexWrap: "wrap", marginBottom: "8px" }}>
-                    <Btn
+                    <FocusBtn
                       onClick={() => setDeleteConfirm(null)}
                     >
                       {t('delete.btn.cancel')}
-                    </Btn>
-                    <Btn
+                    </FocusBtn>
+                    <FocusBtn
                       onClick={() => doDelete(m.name)}
                     >
                       {t('delete.btn.confirm')}
-                    </Btn>
+                    </FocusBtn>
                   </div>
                 </PanelSectionRow>
               ) : (
                 <PanelSectionRow>
                   <div style={{ marginBottom: "8px" }}>
-                    <Btn
+                    <FocusBtn
                       disabled={busy}
                       onClick={() => setDeleteConfirm(m.name)}
                       style={{ color: "#f43f5e" }}
                     >
                       <FaTrash style={{ marginRight: "4px", verticalAlign: "middle" }} />
-                    </Btn>
+                    </FocusBtn>
                   </div>
                 </PanelSectionRow>
               )}
@@ -889,12 +895,12 @@ function Content() {
                     </PanelSectionRow>
                     <PanelSectionRow>
                       <div style={{ marginBottom: "8px" }}>
-                        <Btn
+                        <FocusBtn
                           onClick={() => doLibraryInstall(m.name)}
                           disabled={busy}
                         >
                           {t('library.btn.install')}
-                        </Btn>
+                        </FocusBtn>
                       </div>
                     </PanelSectionRow>
                   </Fragment>
@@ -943,9 +949,9 @@ function Content() {
           </PanelSectionRow>
           <PanelSectionRow>
             <div style={{ marginBottom: "8px" }}>
-              <Btn onClick={doRagDirSave} disabled={busy}>
+              <FocusBtn onClick={doRagDirSave} disabled={busy}>
                 {t('rag.btn.save')}
-              </Btn>
+              </FocusBtn>
             </div>
           </PanelSectionRow>
           {ragConfig && (
@@ -977,12 +983,12 @@ function Content() {
                       {ragConfig.installed_embedding_models.filter((m) => m !== ragConfig.rag_embedding_model).map((m) => (
                         <PanelSectionRow key={m}>
                           <div style={{ marginBottom: "8px" }}>
-                            <Btn
+                            <FocusBtn
                               onClick={() => doRagModelSet(m)}
                               disabled={busy}
                             >
                               {t('rag.embedding.btn.use', { model: m })}
-                            </Btn>
+                            </FocusBtn>
                           </div>
                         </PanelSectionRow>
                       ))}
@@ -991,13 +997,13 @@ function Content() {
                     <PanelSectionRow>
                       <div style={{ display: "flex", gap: "8px", flexWrap: "wrap", marginBottom: "8px" }}>
                         {ragConfig.installed_embedding_models.map((m) => (
-                          <Btn
+                          <FocusBtn
                             key={m}
                             onClick={() => doRagModelSet(m)}
                             disabled={busy}
                           >
                             {t('rag.embedding.btn.use', { model: m })}
-                          </Btn>
+                          </FocusBtn>
                         ))}
                       </div>
                     </PanelSectionRow>
@@ -1013,12 +1019,12 @@ function Content() {
                   {ragConfig.recommended_embedding_model && (
                     <PanelSectionRow>
                       <div style={{ marginBottom: "8px" }}>
-                        <Btn
+                        <FocusBtn
                           onClick={doRagModelInstall}
                           disabled={busy || ragModelInstalling}
                         >
                           {ragModelInstalling ? t('rag.embedding.installing') : t('rag.embedding.btn.install', { model: ragConfig.recommended_embedding_model })}
-                        </Btn>
+                        </FocusBtn>
                       </div>
                     </PanelSectionRow>
                   )}
@@ -1133,7 +1139,7 @@ function Content() {
           </PanelSectionRow>
           <PanelSectionRow>
             <div style={{ display: "flex", gap: "8px", flexWrap: "wrap" }}>
-              <Btn
+              <FocusBtn
                 onClick={() => {
                   setPersonaName(persona.name);
                   setPersonaSystemPrompt(persona.system_prompt);
@@ -1143,8 +1149,8 @@ function Content() {
                 }}
               >
                 {t('persona.btn.reset')}
-              </Btn>
-              <Btn
+              </FocusBtn>
+              <FocusBtn
                 onClick={async () => {
                   const p = {
                     name: personaName || persona.name,
@@ -1164,7 +1170,7 @@ function Content() {
                 disabled={busy}
               >
                 {t('persona.btn.save')}
-              </Btn>
+              </FocusBtn>
             </div>
           </PanelSectionRow>
         </PanelSection>

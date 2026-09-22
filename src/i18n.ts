@@ -195,7 +195,7 @@ const translations: Record<string, Translations> = {
     'delete.btn.confirm': 'Confirmar remoção',
     'delete.desc': 'Remove este modelo permanentemente',
 
-    'lan.title': 'Conexão LAN',
+    'lan.title': 'Ligação LAN',
     'lan.desc': 'Informação para ligar a partir de outros equipamentos na rede:',
     'lan.address': 'Endereço: {url}',
     'lan.models': 'Modelos disponíveis: {models}',
