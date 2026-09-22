@@ -15,6 +15,7 @@
 - [x] T016 Publicação T015 no GitHub (main)
 - [x] T017 Botões compactos (native Btn) e zero flex-end — nada à direita
 - [x] T018 Chat popout sem action icons à direita (bHideActionIcons) + auditoria PT/EN
+- [x] T019 Btn blindado contra CSS global (width:auto) + chat sem botão Enviar (Enter)
 
 ## Backlog
 | Item | Impacto | Esforço | Prioridade | Estado |

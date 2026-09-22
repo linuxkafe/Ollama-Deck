@@ -156,3 +156,28 @@ Registo de aprendizagens relevantes da análise hostil (fase de plan).
   duplicar correções no src.
 - **Applied To**: processo AES (Diagnóstico: primeiro os donos dos pixels).
 - **Date**: 2026-09-22
+
+## [UI] — Botões largos ≠ alinhamento: CSS global do host estica <button>
+- **Task**: T019
+- **Insight**: o utilizador corria EXACTAMENTE o build T018 publicado (hash provado via
+  `ssh deck@10.0.0.128 sha256sum`) e AINDA via botões à direita. Portanto a causa nunca foi
+  o layout (0 flex-end desde T015/T017); era a LARGURA dos `<button>` nativos esticada pelo
+  CSS global do SteamOS/Decky. `inline style display:inline-block; width:auto; flex:0 0
+  auto; flexShrink:0; minWidth:0; boxSizing:border-box; whiteSpace:nowrap` é a defesa
+  intra-plugin (inline > stylesheet).
+- **Origin**: verificação empírica da instalação no device (sha256) + 5ª iteração do report.
+- **Impact**: todos os botões compactos voltam à largura do conteúdo e nunca overflow;
+  regra encerrada: filtrar por width, não por alinhamento.
+- **Applied To**: `Btn` (ui.tsx), tags da biblioteca (index.tsx), filas flex com wrap.
+- **Date**: 2026-09-22
+
+## [UX] — O utilizador pergunta "o enter não basta?" → remover o botão
+- **Task**: T019
+- **Insight**: no chat, o utilizador questiona se o botão Enviar é necessário. Resposta:
+  não. Enter (sem Shift) envia; Shift+Enter nova linha. Menos botões = mais conformidade
+  com a regra do utilizador (zero botões desnecessários).
+- **Origin**: pergunta directa do utilizador (5º report).
+- **Impact**: janela de chat sem qualquer botão além dos controls do modal; footer só
+  textarea.
+- **Applied To**: `src/components/ChatModal.tsx`.
+- **Date**: 2026-09-22

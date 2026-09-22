@@ -519,7 +519,7 @@ function Content() {
           />
         </PanelSectionRow>
         <PanelSectionRow>
-          <div style={{ display: "flex", gap: "8px" }}>
+          <div style={{ display: "flex", gap: "8px", flexWrap: "wrap" }}>
             <Btn
               onClick={() => setPullModalOpen(false)}
             >
@@ -752,7 +752,7 @@ function Content() {
               </PanelSectionRow>
               {deleteConfirm === m.name ? (
                 <PanelSectionRow>
-                  <div style={{ display: "flex", gap: "8px", marginBottom: "8px" }}>
+                  <div style={{ display: "flex", gap: "8px", flexWrap: "wrap", marginBottom: "8px" }}>
                     <Btn
                       onClick={() => setDeleteConfirm(null)}
                     >
@@ -839,6 +839,12 @@ function Content() {
                       }
                     }}
                     style={{
+                      display: "inline-block",
+                      width: "auto",
+                      minWidth: 0,
+                      flex: "0 0 auto",
+                      flexShrink: 0,
+                      boxSizing: "border-box",
                       padding: "4px 10px",
                       borderRadius: "4px",
                       border: isActive ? "1px solid #22c55e" : "1px solid #4a4a4a",
@@ -846,6 +852,7 @@ function Content() {
                       color: isActive ? "#22c55e" : "#e6e6e6",
                       fontSize: "12px",
                       cursor: "pointer",
+                      whiteSpace: "nowrap",
                     }}
                   >
                     {t(tagKey)}
@@ -1125,7 +1132,7 @@ function Content() {
             </select>
           </PanelSectionRow>
           <PanelSectionRow>
-            <div style={{ display: "flex", gap: "8px" }}>
+            <div style={{ display: "flex", gap: "8px", flexWrap: "wrap" }}>
               <Btn
                 onClick={() => {
                   setPersonaName(persona.name);

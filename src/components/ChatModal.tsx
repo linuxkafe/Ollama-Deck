@@ -2,7 +2,6 @@ import { useEffect, useRef, useState } from "react";
 import { ModalRoot, showModal } from "@decky/ui";
 import { callable, toaster } from "@decky/api";
 import { t } from "../i18n";
-import { Btn } from "./ui";
 
 type ModelInfo = {
   name: string;
@@ -250,9 +249,6 @@ function ChatModal({
               maxHeight: "140px",
             }}
           />
-          <Btn onClick={() => handleSend()} disabled={busy || !input.trim() || !model}>
-            {t("chat.btn.send")}
-          </Btn>
         </div>
       </div>
     </div>

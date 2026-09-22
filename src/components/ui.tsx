@@ -17,6 +17,12 @@ export function Btn({
       onClick={onClick}
       disabled={disabled}
       style={{
+        display: "inline-block",
+        width: "auto",
+        minWidth: 0,
+        flex: "0 0 auto",
+        flexShrink: 0,
+        boxSizing: "border-box",
         padding: "6px 12px",
         borderRadius: "4px",
         border: "1px solid #4a4a4a",
