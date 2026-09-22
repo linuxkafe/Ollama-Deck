@@ -592,18 +592,36 @@ function ChatModal({ models, initialModel, initialPersona, initialWebSearch, }) 
         resizeInput();
     }, [input]);
     SP_REACT.useEffect(() => {
-        // Focus the textarea after the popout mounts so the SteamOS on-screen keyboard appears
-        const timer = setTimeout(() => {
-            // Ensure the popout window has focus first
-            window.focus();
+        // Multi-strategy focus to trigger SteamOS virtual keyboard
+        setTimeout(() => {
             const el = inputRef.current;
-            if (el) {
-                el.focus();
-                // Some SteamOS versions need a click to trigger the virtual keyboard
-                el.click();
+            if (!el)
+                return;
+            // Strategy 1: Ensure window has focus
+            window.focus();
+            // Strategy 2: Focus the element
+            el.focus();
+            // Strategy 3: Try Virtual Keyboard API (web standard)
+            const nav = navigator;
+            if (nav.virtualKeyboard && typeof nav.virtualKeyboard.show === 'function') {
+                nav.virtualKeyboard.show().catch(() => { });
             }
+            // Strategy 4: Try Steam client globals (SteamOS specific)
+            const win = window;
+            if (win.SteamClient?.showKeyboard) {
+                win.SteamClient.showKeyboard().catch(() => { });
+            }
+            if (win.Steam?.showKeyboard) {
+                win.Steam.showKeyboard().catch(() => { });
+            }
+            if (win.SteamUI?.showKeyboard) {
+                win.SteamUI.showKeyboard().catch(() => { });
+            }
+            // Strategy 5: Click to trigger (some SteamOS versions)
+            el.click();
+            // Strategy 6: Dispatch focus event
+            el.dispatchEvent(new FocusEvent('focus', { bubbles: true }));
         }, 500);
-        return () => clearTimeout(timer);
     }, []);
     const handleSend = async () => {
         if (!input.trim() || !model || busy)
