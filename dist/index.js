@@ -596,7 +596,12 @@ function ChatModal({ models, initialModel, initialPersona, initialWebSearch, }) 
         const timer = setTimeout(() => {
             // Ensure the popout window has focus first
             window.focus();
-            inputRef.current?.focus();
+            const el = inputRef.current;
+            if (el) {
+                el.focus();
+                // Some SteamOS versions need a click to trigger the virtual keyboard
+                el.click();
+            }
         }, 500);
         return () => clearTimeout(timer);
     }, []);
