@@ -754,26 +754,22 @@ function ChatModal({ models, initialModel, initialPersona, initialWebSearch, }) 
                             borderRadius: "8px",
                             background: msg.role === "user" ? "#22c55e22" : "#1a1a1a",
                             border: msg.role === "user" ? "1px solid #22c55e44" : "1px solid #4a4a4a",
-                        }, children: [SP_JSX.jsx("div", { style: { fontSize: "12px", color: "#8b8b8b", marginBottom: "8px", fontWeight: 500 }, children: msg.role === "user" ? t("chat.role.user") : t("chat.role.assistant") }), SP_JSX.jsx("div", { style: { color: "#fafafa", whiteSpace: "pre-wrap", wordBreak: "break-word", lineHeight: "1.5", fontSize: "15px" }, children: msg.content })] }, idx))), busy && (SP_JSX.jsx("div", { style: { padding: "12px", color: "#22c55e", fontStyle: "italic" }, children: t("chat.thinking") })), SP_JSX.jsx("div", { ref: listEndRef })] }), SP_JSX.jsx("div", { style: { padding: "16px", borderTop: "1px solid #4a4a4a", background: "#1a1a1a" }, children: SP_JSX.jsx("div", { style: { display: "flex", flexDirection: "column", gap: "10px" }, children: SP_JSX.jsx("textarea", { ref: inputRef, value: input, onChange: (e) => setInput(e.target.value), onKeyDown: (e) => {
-                            if (e.key === "Enter" && !e.shiftKey) {
-                                e.preventDefault();
-                                if (!busy)
-                                    handleSend();
-                            }
-                        }, placeholder: t("chat.input.placeholder"), disabled: busy || !model, rows: 1, style: {
-                            width: "100%",
-                            boxSizing: "border-box",
-                            resize: "none",
-                            overflow: "hidden",
-                            padding: "12px 14px",
-                            borderRadius: "8px",
-                            border: "1px solid #4a4a4a",
-                            background: "#0a0a0a",
-                            color: "#fafafa",
-                            fontSize: "16px",
-                            lineHeight: "1.4",
-                            maxHeight: "140px",
-                        } }) }) })] }));
+                        }, children: [SP_JSX.jsx("div", { style: { fontSize: "12px", color: "#8b8b8b", marginBottom: "8px", fontWeight: 500 }, children: msg.role === "user" ? t("chat.role.user") : t("chat.role.assistant") }), SP_JSX.jsx("div", { style: { color: "#fafafa", whiteSpace: "pre-wrap", wordBreak: "break-word", lineHeight: "1.5", fontSize: "15px" }, children: msg.content })] }, idx))), busy && (SP_JSX.jsx("div", { style: { padding: "12px", color: "#22c55e", fontStyle: "italic" }, children: t("chat.thinking") })), SP_JSX.jsx("div", { ref: listEndRef })] }), SP_JSX.jsx("div", { style: { padding: "16px", borderTop: "1px solid #4a4a4a", background: "#1a1a1a" }, children: SP_JSX.jsxs("div", { style: { display: "flex", flexDirection: "column", gap: "10px" }, children: [SP_JSX.jsx(DFL.TextField, { value: input, onChange: (e) => setInput(e.target.value), onKeyDown: (e) => {
+                                if (e.key === "Enter" && !e.shiftKey) {
+                                    e.preventDefault();
+                                    if (!busy)
+                                        handleSend();
+                                }
+                            }, disabled: busy || !model, focusOnMount: true, style: {
+                                width: "100%",
+                                boxSizing: "border-box",
+                                padding: "12px 14px",
+                                borderRadius: "8px",
+                                border: "1px solid #4a4a4a",
+                                background: "#0a0a0a",
+                                color: "#fafafa",
+                                fontSize: "16px",
+                            } }), SP_JSX.jsx(FocusBtn, { onClick: handleSend, disabled: busy || !input.trim() || !model, style: { alignSelf: "flex-end" }, children: t("chat.btn.send") })] }) })] }));
 }
 
 const getStatus = callable("get_status");

@@ -1,7 +1,8 @@
 import { useEffect, useRef, useState } from "react";
-import { ModalRoot, showModal } from "@decky/ui";
+import { ModalRoot, showModal, TextField } from "@decky/ui";
 import { callable, toaster } from "@decky/api";
 import { t } from "../i18n";
+import { FocusBtn } from "./ui";
 
 type ModelInfo = {
   name: string;
@@ -252,8 +253,7 @@ useEffect(() => {
       </div>
       <div style={{ padding: "16px", borderTop: "1px solid #4a4a4a", background: "#1a1a1a" }}>
         <div style={{ display: "flex", flexDirection: "column", gap: "10px" }}>
-          <textarea
-            ref={inputRef}
+          <TextField
             value={input}
             onChange={(e) => setInput(e.target.value)}
             onKeyDown={(e) => {
@@ -262,24 +262,26 @@ useEffect(() => {
                 if (!busy) handleSend();
               }
             }}
-            placeholder={t("chat.input.placeholder")}
             disabled={busy || !model}
-            rows={1}
+            focusOnMount
             style={{
               width: "100%",
               boxSizing: "border-box",
-              resize: "none",
-              overflow: "hidden",
               padding: "12px 14px",
               borderRadius: "8px",
               border: "1px solid #4a4a4a",
               background: "#0a0a0a",
               color: "#fafafa",
               fontSize: "16px",
-              lineHeight: "1.4",
-              maxHeight: "140px",
             }}
           />
+          <FocusBtn
+              onClick={handleSend}
+              disabled={busy || !input.trim() || !model}
+              style={{ alignSelf: "flex-end" }}
+            >
+              {t("chat.btn.send")}
+            </FocusBtn>
         </div>
       </div>
     </div>
