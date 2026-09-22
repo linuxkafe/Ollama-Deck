@@ -81,6 +81,8 @@ function IconBase(props) {
 // THIS FILE IS AUTO GENERATED
 function FaTrash (props) {
   return GenIcon({"attr":{"viewBox":"0 0 448 512"},"child":[{"tag":"path","attr":{"d":"M432 32H312l-9.4-18.7A24 24 0 0 0 281.1 0H166.8a23.72 23.72 0 0 0-21.4 13.3L136 32H16A16 16 0 0 0 0 48v32a16 16 0 0 0 16 16h416a16 16 0 0 0 16-16V48a16 16 0 0 0-16-16zM53.2 467a48 48 0 0 0 47.9 45h245.8a48 48 0 0 0 47.9-45L416 128H32z"},"child":[]}]})(props);
+}function FaSave (props) {
+  return GenIcon({"attr":{"viewBox":"0 0 448 512"},"child":[{"tag":"path","attr":{"d":"M433.941 129.941l-83.882-83.882A48 48 0 0 0 316.118 32H48C21.49 32 0 53.49 0 80v352c0 26.51 21.49 48 48 48h352c26.51 0 48-21.49 48-48V163.882a48 48 0 0 0-14.059-33.941zM224 416c-35.346 0-64-28.654-64-64 0-35.346 28.654-64 64-64s64 28.654 64 64c0 35.346-28.654 64-64 64zm96-304.52V212c0 6.627-5.373 12-12 12H76c-6.627 0-12-5.373-12-12V108c0-6.627 5.373-12 12-12h228.52c3.183 0 6.235 1.264 8.485 3.515l3.48 3.48A11.996 11.996 0 0 1 320 111.48z"},"child":[]}]})(props);
 }function FaRobot (props) {
   return GenIcon({"attr":{"viewBox":"0 0 640 512"},"child":[{"tag":"path","attr":{"d":"M32,224H64V416H32A31.96166,31.96166,0,0,1,0,384V256A31.96166,31.96166,0,0,1,32,224Zm512-48V448a64.06328,64.06328,0,0,1-64,64H160a64.06328,64.06328,0,0,1-64-64V176a79.974,79.974,0,0,1,80-80H288V32a32,32,0,0,1,64,0V96H464A79.974,79.974,0,0,1,544,176ZM264,256a40,40,0,1,0-40,40A39.997,39.997,0,0,0,264,256Zm-8,128H192v32h64Zm96,0H288v32h64ZM456,256a40,40,0,1,0-40,40A39.997,39.997,0,0,0,456,256Zm-8,128H384v32h64ZM640,256V384a31.96166,31.96166,0,0,1-32,32H576V224h32A31.96166,31.96166,0,0,1,640,256Z"},"child":[]}]})(props);
 }function FaDownload (props) {
@@ -357,6 +359,197 @@ function t(key, params) {
     return text;
 }
 
+const btnBase = {
+    display: "inline-block",
+    width: "auto",
+    minWidth: 0,
+    flex: "0 0 auto",
+    flexShrink: 0,
+    boxSizing: "border-box",
+    padding: "6px 12px",
+    borderRadius: "4px",
+    border: "1px solid #4a4a4a",
+    background: "#1a1a1a",
+    color: "#fafafa",
+    fontSize: "13px",
+    cursor: "pointer",
+    whiteSpace: "nowrap",
+};
+function FocusBtn({ onClick, disabled, children, style, }) {
+    const run = () => {
+        if (!disabled && onClick)
+            onClick();
+    };
+    return (SP_JSX.jsx(DFL.Focusable, { onActivate: run, onClick: run, style: {
+            ...btnBase,
+            ...(disabled ? { opacity: 0.4, cursor: "default" } : {}),
+            ...style,
+        }, children: children }));
+}
+
+const ragDirSave = callable("rag_dir_save");
+const ragEmbeddingInstall = callable("rag_embedding_install");
+const ragEmbeddingSet = callable("rag_embedding_set");
+function openRagModal(opts) {
+    const screenW = window.screen?.width && window.screen.width > 0 ? window.screen.width : 1280;
+    const screenH = window.screen?.height && window.screen.height > 0 ? window.screen.height : 800;
+    let closeModal = () => { };
+    const modal = DFL.showModal(SP_JSX.jsx(DFL.ModalRoot, { bAllowFullSize: true, closeModal: () => closeModal(), onCancel: () => closeModal(), onEscKeypress: () => closeModal(), children: SP_JSX.jsx(RagModal, { config: opts.config }) }), undefined, {
+        strTitle: t("rag.title"),
+        bForcePopOut: true,
+        bHideActionIcons: true,
+        bHideMainWindowForPopouts: true,
+        bNeverPopOut: false,
+        popupWidth: screenW,
+        popupHeight: screenH,
+    });
+    closeModal = modal.Close;
+}
+function RagModal({ config: initialConfig }) {
+    const [config, setConfig] = SP_REACT.useState(initialConfig);
+    const [busy, setBusy] = SP_REACT.useState(false);
+    const [dir, setDir] = SP_REACT.useState(initialConfig.rag_dir);
+    const dirInputRef = SP_REACT.useRef(null);
+    const doRagDirSave = async () => {
+        if (busy || !dir.trim())
+            return;
+        setBusy(true);
+        try {
+            const res = await ragDirSave(dir.trim());
+            if (!res.ok) {
+                toaster.toast({ title: t("toast.rag.dir.saved"), body: res.error || t("chat.error.unknown"), critical: true });
+            }
+            else {
+                toaster.toast({ title: t("toast.rag.dir.saved"), body: `${t("toast.rag.dir.saved")}: ${dir}` });
+                setConfig(prev => ({ ...prev, rag_dir: dir.trim() }));
+            }
+        }
+        catch (err) {
+            toaster.toast({ title: t("chat.error.failed"), body: String(err), critical: true });
+        }
+        finally {
+            setBusy(false);
+        }
+    };
+    const doEmbeddingInstall = async (model) => {
+        if (busy)
+            return;
+        setBusy(true);
+        try {
+            const res = await ragEmbeddingInstall(model);
+            if (!res.ok) {
+                toaster.toast({ title: t("toast.rag.embedding.installed"), body: res.error || t("chat.error.unknown"), critical: true });
+            }
+            else {
+                toaster.toast({ title: t("toast.rag.embedding.installed"), body: `${t("toast.rag.embedding.installed")}: ${model}` });
+                setConfig(prev => ({ ...prev, installed_embedding_models: [...prev.installed_embedding_models, model] }));
+            }
+        }
+        catch (err) {
+            toaster.toast({ title: t("chat.error.failed"), body: String(err), critical: true });
+        }
+        finally {
+            setBusy(false);
+        }
+    };
+    const doEmbeddingSet = async (model) => {
+        if (busy)
+            return;
+        setBusy(true);
+        try {
+            const res = await ragEmbeddingSet(model);
+            if (!res.ok) {
+                toaster.toast({ title: t("toast.rag.embedding.set"), body: res.error || t("chat.error.unknown"), critical: true });
+            }
+            else {
+                toaster.toast({ title: t("toast.rag.embedding.set"), body: `${t("toast.rag.embedding.set")}: ${model}` });
+                setConfig(prev => ({ ...prev, current_embedding_model: model }));
+            }
+        }
+        catch (err) {
+            toaster.toast({ title: t("chat.error.failed"), body: String(err), critical: true });
+        }
+        finally {
+            setBusy(false);
+        }
+    };
+    return (SP_JSX.jsxs("div", { style: { display: "flex", flexDirection: "column", height: "100%", minHeight: "70vh", width: "100%", boxSizing: "border-box", overflow: "hidden", background: "#0a0a0a" }, children: [SP_JSX.jsx("div", { style: { padding: "12px 16px", borderBottom: "1px solid #4a4a4a", background: "#1a1a1a" }, children: SP_JSX.jsx("div", { style: { display: "flex", flexDirection: "column", gap: "12px" }, children: SP_JSX.jsxs("div", { children: [SP_JSX.jsx("label", { style: { display: "block", color: "#8b8b8b", fontSize: "12px", marginBottom: "6px" }, children: t("rag.dir.placeholder") }), SP_JSX.jsxs("div", { style: { display: "flex", gap: "8px" }, children: [SP_JSX.jsx("input", { ref: dirInputRef, type: "text", value: dir, onChange: e => setDir(e.target.value), placeholder: t("rag.dir.placeholder"), disabled: busy, style: { flex: 1, padding: "10px 12px", borderRadius: "6px", border: "1px solid #4a4a4a", background: "#0a0a0a", color: "#fafafa", fontSize: "14px", boxSizing: "border-box" } }), SP_JSX.jsxs(FocusBtn, { onClick: doRagDirSave, disabled: busy, children: [SP_JSX.jsx(FaSave, { style: { marginRight: "6px", verticalAlign: "middle" } }), t("rag.btn.save")] })] }), config.rag_dir && (SP_JSX.jsx("div", { style: { color: "#8b8b8b", fontSize: "11px", marginTop: "4px" }, children: t("rag.current", { dir: config.rag_dir }) }))] }) }) }), SP_JSX.jsxs("div", { style: { flex: 1, minHeight: 0, overflowY: "auto", padding: "16px" }, children: [SP_JSX.jsxs("div", { style: { marginBottom: "16px" }, children: [SP_JSX.jsx("div", { style: { color: "#8b8b8b", fontSize: "12px", marginBottom: "8px" }, children: t("rag.embedding.title") }), config.installed_embedding_models.length === 0 ? (SP_JSX.jsx("div", { style: { color: "#8b8b8b", padding: "16px", background: "#1a1a1a", borderRadius: "8px", border: "1px solid #4a4a4a" }, children: t("rag.embedding.none") })) : (SP_JSX.jsxs(SP_JSX.Fragment, { children: [SP_JSX.jsx("div", { style: { color: "#8b8b8b", fontSize: "11px", marginBottom: "8px" }, children: t("rag.embedding.installed", { models: config.installed_embedding_models.join(", ") }) }), config.current_embedding_model && (SP_JSX.jsx("div", { style: { color: "#22c55e", fontSize: "11px", marginBottom: "8px" }, children: t("rag.embedding.active", { model: config.current_embedding_model }) })), SP_JSX.jsx("div", { style: { display: "flex", gap: "8px", flexWrap: "wrap", marginBottom: "8px" }, children: config.installed_embedding_models.map((m) => (SP_JSX.jsx(FocusBtn, { onClick: () => doEmbeddingSet(m), disabled: busy || config.current_embedding_model === m, style: { background: config.current_embedding_model === m ? "#22c55e22" : "#1a1a1a", borderColor: config.current_embedding_model === m ? "#22c55e" : "#4a4a4a" }, children: t("rag.embedding.btn.use", { model: m }) }, m))) })] }))] }), SP_JSX.jsxs("div", { style: { marginTop: "16px" }, children: [SP_JSX.jsx("div", { style: { color: "#8b8b8b", fontSize: "12px", marginBottom: "8px" }, children: t("rag.embedding.btn.install", { model: "nomic-embed-text" }) }), SP_JSX.jsx("div", { style: { display: "flex", gap: "8px", flexWrap: "wrap" }, children: SP_JSX.jsxs(FocusBtn, { onClick: () => doEmbeddingInstall("nomic-embed-text"), disabled: busy || config.installed_embedding_models.includes("nomic-embed-text"), children: [SP_JSX.jsx(FaDownload, { style: { marginRight: "6px", verticalAlign: "middle" } }), t("rag.embedding.btn.install", { model: "nomic-embed-text" })] }) })] })] })] }));
+}
+
+const pullModel$1 = callable("pull_model");
+const deleteModel = callable("delete_model");
+function openModelsModal(opts) {
+    const screenW = window.screen?.width && window.screen.width > 0 ? window.screen.width : 1280;
+    const screenH = window.screen?.height && window.screen.height > 0 ? window.screen.height : 800;
+    let closeModal = () => { };
+    const modal = DFL.showModal(SP_JSX.jsx(DFL.ModalRoot, { bAllowFullSize: true, closeModal: () => closeModal(), onCancel: () => closeModal(), onEscKeypress: () => closeModal(), children: SP_JSX.jsx(ModelsModal, { models: opts.models }) }), undefined, {
+        strTitle: t("models.title"),
+        bForcePopOut: true,
+        bHideActionIcons: true,
+        bHideMainWindowForPopouts: true,
+        bNeverPopOut: false,
+        popupWidth: screenW,
+        popupHeight: screenH,
+    });
+    closeModal = modal.Close;
+}
+function ModelsModal({ models: initialModels }) {
+    const [models, setModels] = SP_REACT.useState(initialModels);
+    const [busy, setBusy] = SP_REACT.useState(false);
+    const [pullName, setPullName] = SP_REACT.useState("");
+    const [search, setSearch] = SP_REACT.useState("");
+    const [filtered, setFiltered] = SP_REACT.useState(initialModels);
+    const listEndRef = SP_REACT.useRef(null);
+    SP_REACT.useEffect(() => {
+        setFiltered(models.filter(m => m.name.toLowerCase().includes(search.toLowerCase())));
+    }, [search, models]);
+    const doPull = async () => {
+        if (!pullName.trim() || busy)
+            return;
+        const name = pullName.trim();
+        setBusy(true);
+        setPullName("");
+        try {
+            const res = await pullModel$1(name);
+            if (!res.ok) {
+                toaster.toast({ title: t("toast.model.installed"), body: res.detail || t("chat.error.unknown"), critical: true });
+            }
+            else {
+                toaster.toast({ title: t("toast.model.installed"), body: `${t("toast.model.installed")}: ${name}` });
+                setModels(prev => [...prev, { name, size: 0, family: "", quant: "" }]);
+            }
+        }
+        catch (err) {
+            toaster.toast({ title: t("chat.error.failed"), body: String(err), critical: true });
+        }
+        finally {
+            setBusy(false);
+        }
+    };
+    const doDelete = async (name) => {
+        if (busy)
+            return;
+        setBusy(true);
+        try {
+            const res = await deleteModel(name);
+            if (!res.ok) {
+                toaster.toast({ title: t("toast.model.removed"), body: res.detail || t("chat.error.unknown"), critical: true });
+            }
+            else {
+                toaster.toast({ title: t("toast.model.removed"), body: `${t("toast.model.removed")}: ${name}` });
+                setModels(prev => prev.filter(m => m.name !== name));
+            }
+        }
+        catch (err) {
+            toaster.toast({ title: t("chat.error.failed"), body: String(err), critical: true });
+        }
+        finally {
+            setBusy(false);
+        }
+    };
+    return (SP_JSX.jsxs("div", { style: { display: "flex", flexDirection: "column", height: "100%", minHeight: "70vh", width: "100%", boxSizing: "border-box", overflow: "hidden", background: "#0a0a0a" }, children: [SP_JSX.jsx("div", { style: { padding: "12px 16px", borderBottom: "1px solid #4a4a4a", background: "#1a1a1a" }, children: SP_JSX.jsxs("div", { style: { display: "flex", flexDirection: "column", gap: "10px" }, children: [SP_JSX.jsxs("div", { style: { display: "flex", gap: "8px", flexWrap: "wrap" }, children: [SP_JSX.jsx("input", { type: "text", value: search, onChange: e => setSearch(e.target.value), placeholder: t("library.search.placeholder"), style: { flex: 1, minWidth: "200px", padding: "10px 12px", borderRadius: "6px", border: "1px solid #4a4a4a", background: "#0a0a0a", color: "#fafafa", fontSize: "16px" } }), SP_JSX.jsxs(FocusBtn, { onClick: doPull, disabled: busy || !pullName.trim(), children: [SP_JSX.jsx(FaDownload, { style: { marginRight: "6px", verticalAlign: "middle" } }), t("updates.btn.install")] })] }), SP_JSX.jsx("input", { type: "text", value: pullName, onChange: e => setPullName(e.target.value), placeholder: t("updates.btn.install.desc"), disabled: busy, style: { width: "100%", boxSizing: "border-box", padding: "10px 12px", borderRadius: "6px", border: "1px solid #4a4a4a", background: "#0a0a0a", color: "#fafafa", fontSize: "16px" } })] }) }), SP_JSX.jsxs("div", { style: { flex: 1, minHeight: 0, overflowY: "auto", padding: "16px" }, children: [filtered.length === 0 && (SP_JSX.jsx("div", { style: { color: "#8b8b8b", textAlign: "center", padding: "40px 16px" }, children: t("library.empty") })), filtered.map((m) => (SP_JSX.jsxs("div", { style: { marginBottom: "12px", padding: "12px", borderRadius: "8px", background: "#1a1a1a", border: "1px solid #4a4a4a", display: "flex", flexDirection: "column", gap: "8px" }, children: [SP_JSX.jsxs("div", { style: { display: "flex", justifyContent: "space-between", alignItems: "center" }, children: [SP_JSX.jsx("strong", { style: { fontSize: "16px" }, children: m.name }), SP_JSX.jsx("div", { style: { display: "flex", gap: "8px" }, children: SP_JSX.jsxs(FocusBtn, { onClick: () => doDelete(m.name), disabled: busy, style: { color: "#f43f5e", borderColor: "#f43f5e" }, children: [SP_JSX.jsx(FaTrash, { style: { marginRight: "6px", verticalAlign: "middle" } }), t("delete.btn.confirm")] }) })] }), SP_JSX.jsxs("div", { style: { color: "#8b8b8b", fontSize: "12px" }, children: [m.family, " \u00B7 ", m.quant, " \u00B7 ", (m.size / (1024 * 1024 * 1024)).toFixed(1), " GB"] })] }, m.name))), SP_JSX.jsx("div", { ref: listEndRef })] })] }));
+}
+
 const chat = callable("chat");
 function openChatModal(opts) {
     const screenW = window.screen?.width && window.screen.width > 0 ? window.screen.width : 1280;
@@ -484,45 +677,15 @@ function ChatModal({ models, initialModel, initialPersona, initialWebSearch, }) 
                         } }) }) })] }));
 }
 
-const btnBase = {
-    display: "inline-block",
-    width: "auto",
-    minWidth: 0,
-    flex: "0 0 auto",
-    flexShrink: 0,
-    boxSizing: "border-box",
-    padding: "6px 12px",
-    borderRadius: "4px",
-    border: "1px solid #4a4a4a",
-    background: "#1a1a1a",
-    color: "#fafafa",
-    fontSize: "13px",
-    cursor: "pointer",
-    whiteSpace: "nowrap",
-};
-function FocusBtn({ onClick, disabled, children, style, }) {
-    const run = () => {
-        if (!disabled && onClick)
-            onClick();
-    };
-    return (SP_JSX.jsx(DFL.Focusable, { onActivate: run, onClick: run, style: {
-            ...btnBase,
-            ...(disabled ? { opacity: 0.4, cursor: "default" } : {}),
-            ...style,
-        }, children: children }));
-}
-
 const getStatus = callable("get_status");
 const setService = callable("set_service");
 const setAutostart = callable("set_autostart");
 const setKeepAwake = callable("set_keep_awake");
 const updateAll = callable("update_all");
 const pullModel = callable("pull_model");
-const deleteModel = callable("delete_model");
 const lanInfo = callable("lan_info");
 const searchModels = callable("search_models");
 const getRagConfig = callable("get_rag_config");
-const setRagConfig = callable("set_rag_config");
 const setNetworkExposure = callable("set_network_exposure");
 const getPersona = callable("get_persona");
 const setPersona = callable("set_persona");
@@ -533,17 +696,6 @@ const DEFAULT_PERSONA = {
     max_tokens: 2048,
     model: "",
 };
-function formatSize(size) {
-    const units = ["B", "KB", "MB", "GB", "TB"];
-    let value = size;
-    for (let i = 0; i < units.length; i++) {
-        if (value < 1024 || i === units.length - 1) {
-            return `${value.toFixed(1)} ${units[i]}`;
-        }
-        value /= 1024;
-    }
-    return `${value.toFixed(1)} TB`;
-}
 function StatusDot({ ok }) {
     return (SP_JSX.jsx("span", { style: {
             display: "inline-block",
@@ -560,7 +712,6 @@ function Content() {
     const [busy, setBusy] = SP_REACT.useState(false);
     const [pullModalOpen, setPullModalOpen] = SP_REACT.useState(false);
     const [pullModelName, setPullModelName] = SP_REACT.useState("");
-    const [deleteConfirm, setDeleteConfirm] = SP_REACT.useState(null);
     const [chatModel, setChatModel] = SP_REACT.useState("");
     const [lanInfoData, setLanInfoData] = SP_REACT.useState(null);
     const [lanInfoLoaded, setLanInfoLoaded] = SP_REACT.useState(false);
@@ -570,7 +721,6 @@ function Content() {
     const [libraryLoading, setLibraryLoading] = SP_REACT.useState(false);
     const [ragConfig, setRagConfigState] = SP_REACT.useState(null);
     const [ragDirInput, setRagDirInput] = SP_REACT.useState("");
-    const [ragModelInstalling, setRagModelInstalling] = SP_REACT.useState(false);
     const [networkExpose, setNetworkExpose] = SP_REACT.useState(false);
     const [webSearchEnabled] = SP_REACT.useState(true);
     const [persona, setPersonaState] = SP_REACT.useState(DEFAULT_PERSONA);
@@ -655,37 +805,6 @@ function Content() {
         catch (err) {
             toaster.toast({
                 title: t('toast.pull.failed'),
-                body: String(err),
-                critical: true,
-            });
-        }
-        finally {
-            setBusy(false);
-            await refresh();
-        }
-    };
-    const doDelete = async (tag) => {
-        setDeleteConfirm(null);
-        setBusy(true);
-        try {
-            const res = await deleteModel(tag);
-            if (!res.ok) {
-                toaster.toast({
-                    title: t('toast.delete.failed'),
-                    body: res.error || t('toast.delete.error', { model: tag }),
-                    critical: true,
-                });
-            }
-            else {
-                toaster.toast({
-                    title: t('toast.model.removed'),
-                    body: tag,
-                });
-            }
-        }
-        catch (err) {
-            toaster.toast({
-                title: t('toast.delete.failed'),
                 body: String(err),
                 critical: true,
             });
@@ -785,72 +904,6 @@ function Content() {
             await refresh();
         }
     };
-    const doRagDirSave = async () => {
-        setBusy(true);
-        try {
-            const res = await setRagConfig(ragDirInput.trim() || undefined, undefined);
-            if (!res.ok) {
-                toaster.toast({
-                    title: t('toast.save.failed'),
-                    body: res.error || t('toast.save.error'),
-                    critical: true,
-                });
-            }
-            else {
-                toaster.toast({ title: t('toast.rag.dir.saved'), body: res.rag_documents_dir });
-                setRagConfigState(res);
-            }
-        }
-        catch (err) {
-            toaster.toast({ title: t('toast.save.failed'), body: String(err), critical: true });
-        }
-        finally {
-            setBusy(false);
-        }
-    };
-    const doRagModelInstall = async () => {
-        if (!ragConfig?.recommended_embedding_model)
-            return;
-        setRagModelInstalling(true);
-        setBusy(true);
-        try {
-            const model = ragConfig.recommended_embedding_model;
-            const res = await pullModel(model);
-            if (!res.ok) {
-                toaster.toast({ title: t('toast.rag.install.failed'), body: res.error || t('toast.rag.install.error'), critical: true });
-            }
-            else {
-                toaster.toast({ title: t('toast.rag.embedding.installed'), body: model });
-                await loadRagConfig();
-            }
-        }
-        catch (err) {
-            toaster.toast({ title: t('toast.rag.install.failed'), body: String(err), critical: true });
-        }
-        finally {
-            setRagModelInstalling(false);
-            setBusy(false);
-        }
-    };
-    const doRagModelSet = async (model) => {
-        setBusy(true);
-        try {
-            const res = await setRagConfig(undefined, model);
-            if (!res.ok) {
-                toaster.toast({ title: t('toast.rag.set.failed'), body: res.error || t('toast.rag.set.failed'), critical: true });
-            }
-            else {
-                toaster.toast({ title: t('toast.rag.embedding.set'), body: model });
-                setRagConfigState(res);
-            }
-        }
-        catch (err) {
-            toaster.toast({ title: t('toast.rag.set.failed'), body: String(err), critical: true });
-        }
-        finally {
-            setBusy(false);
-        }
-    };
     const doUpdate = async () => {
         setBusy(true);
         let res;
@@ -919,12 +972,7 @@ function Content() {
                                 ? t('updates.btn.update.desc.active')
                                 : t('updates.btn.update.desc.inactive'), children: [SP_JSX.jsx(FaDownload, { style: { marginRight: "8px", verticalAlign: "middle" } }), t('updates.btn.update')] }) }), SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsxs(DFL.ButtonItem, { layout: "below", disabled: busy || !status.service_active, onClick: () => setPullModalOpen(true), description: t('updates.btn.install.desc'), children: [SP_JSX.jsx(FaDownload, { style: { marginRight: "8px", verticalAlign: "middle" } }), t('updates.btn.install')] }) }), SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsx("div", { style: { color: "#8b8b8b", fontSize: "12px" }, children: busy
                                 ? t('updates.status.updating')
-                                : t('updates.status.idle', { version: status.version ?? "—", count: status.models.length }) }) })] }), status.service_active && status.models.length > 0 ? (SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsx("div", { style: { marginBottom: "8px" }, children: SP_JSX.jsxs(DFL.ButtonItem, { layout: "below", disabled: busy, onClick: handleOpenChat, description: t('chat.btn.open.desc'), children: [SP_JSX.jsx(FaRobot, { style: { marginRight: "8px", verticalAlign: "middle" } }), t('chat.btn.open')] }) }) })) : null, status.service_active ? (SP_JSX.jsxs(DFL.PanelSection, { children: [SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsx(DFL.Focusable, { noFocusRing: true, style: { padding: "8px 0" }, children: SP_JSX.jsx("strong", { children: t('lan.title') }) }) }), SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsx("div", { style: { color: "#8b8b8b", fontSize: "12px", marginBottom: "8px" }, children: t('lan.desc') }) }), lanInfoData ? (SP_JSX.jsxs(SP_JSX.Fragment, { children: [lanInfoData.warning && (SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsx("div", { style: { color: "#f43f5e", fontSize: "11px", padding: "8px", background: "#f43f5e11", borderRadius: "4px", border: "1px solid #f43f5e33", marginBottom: "8px" }, children: lanInfoData.warning }) })), SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsx("div", { style: { color: "#e6e6e6", fontSize: "12px", marginBottom: "8px" }, children: SP_JSX.jsx("strong", { children: t('lan.address', { url: lanInfoData.base_url ?? '' }) }) }) }), SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsx("div", { style: { color: "#8b8b8b", fontSize: "11px", marginBottom: "8px" }, children: t('lan.models', { models: lanInfoData.models?.join(", ") || 'none' }) }) }), SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsx("div", { style: { color: "#8b8b8b", fontSize: "11px", marginBottom: "8px" }, children: t('lan.examples') }) }), lanInfoData.examples && Object.entries(lanInfoData.examples).map(([lang, cmd]) => (SP_JSX.jsxs(SP_REACT.Fragment, { children: [SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsx("code", { style: { display: "block", width: "100%", boxSizing: "border-box", fontSize: "10px", background: "#1a1a1a", padding: "4px 8px", borderRadius: "4px", color: "#22c55e", whiteSpace: "pre-wrap", wordBreak: "break-all" }, children: cmd }) }), SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsx("div", { style: { marginBottom: "8px" }, children: SP_JSX.jsx(FocusBtn, { onClick: () => navigator.clipboard.writeText(cmd), disabled: busy, children: t('lan.btn.copy') }) }) })] }, lang)))] })) : (SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsx("div", { style: { color: "#8b8b8b", fontSize: "12px", marginBottom: "8px" }, children: t('lan.loading') }) }))] })) : null, status.models.length > 0 ? (SP_JSX.jsx(DFL.PanelSection, { title: t('models.title'), children: status.models.map((m) => (SP_JSX.jsxs(SP_REACT.Fragment, { children: [SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsxs("div", { style: {
-                                    display: "flex",
-                                    justifyContent: "space-between",
-                                    alignItems: "center",
-                                    color: "#e6e6e6"
-                                }, children: [SP_JSX.jsx("span", { children: m.name }), SP_JSX.jsxs("span", { style: { color: "#8b8b8b" }, children: [m.family, " \u00B7 ", formatSize(m.size)] })] }) }), deleteConfirm === m.name ? (SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsxs("div", { style: { display: "flex", gap: "8px", flexWrap: "wrap", marginBottom: "8px" }, children: [SP_JSX.jsx(FocusBtn, { onClick: () => setDeleteConfirm(null), children: t('delete.btn.cancel') }), SP_JSX.jsx(FocusBtn, { onClick: () => doDelete(m.name), children: t('delete.btn.confirm') })] }) })) : (SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsx("div", { style: { marginBottom: "8px" }, children: SP_JSX.jsx(FocusBtn, { disabled: busy, onClick: () => setDeleteConfirm(m.name), style: { color: "#f43f5e" }, children: SP_JSX.jsx(FaTrash, { style: { marginRight: "4px", verticalAlign: "middle" } }) }) }) }))] }, m.name))) })) : (SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsx("div", { style: { color: "#8b8b8b", fontSize: "12px", marginBottom: "8px" }, children: t('models.empty') }) })), status.error ? (SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsx("div", { style: { color: "#f43f5e", fontSize: "12px", marginBottom: "8px" }, children: status.error }) })) : null, status.service_active && (SP_JSX.jsxs(DFL.PanelSection, { title: t('library.title'), children: [SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsx("div", { style: { color: "#8b8b8b", fontSize: "12px", marginBottom: "8px" }, children: t('library.desc') }) }), SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsx("input", { type: "text", value: librarySearch, onChange: (e) => setLibrarySearch(e.target.value), placeholder: t('library.search.placeholder'), style: {
+                                : t('updates.status.idle', { version: status.version ?? "—", count: status.models.length }) }) })] }), status.service_active && status.models.length > 0 ? (SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsx("div", { style: { marginBottom: "8px" }, children: SP_JSX.jsxs(DFL.ButtonItem, { layout: "below", disabled: busy, onClick: handleOpenChat, description: t('chat.btn.open.desc'), children: [SP_JSX.jsx(FaRobot, { style: { marginRight: "8px", verticalAlign: "middle" } }), t('chat.btn.open')] }) }) })) : null, status.service_active ? (SP_JSX.jsxs(DFL.PanelSection, { children: [SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsx(DFL.Focusable, { noFocusRing: true, style: { padding: "8px 0" }, children: SP_JSX.jsx("strong", { children: t('lan.title') }) }) }), SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsx("div", { style: { color: "#8b8b8b", fontSize: "12px", marginBottom: "8px" }, children: t('lan.desc') }) }), lanInfoData ? (SP_JSX.jsxs(SP_JSX.Fragment, { children: [lanInfoData.warning && (SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsx("div", { style: { color: "#f43f5e", fontSize: "11px", padding: "8px", background: "#f43f5e11", borderRadius: "4px", border: "1px solid #f43f5e33", marginBottom: "8px" }, children: lanInfoData.warning }) })), SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsx("div", { style: { color: "#e6e6e6", fontSize: "12px", marginBottom: "8px" }, children: SP_JSX.jsx("strong", { children: t('lan.address', { url: lanInfoData.base_url ?? '' }) }) }) }), SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsx("div", { style: { color: "#8b8b8b", fontSize: "11px", marginBottom: "8px" }, children: t('lan.models', { models: lanInfoData.models?.join(", ") || 'none' }) }) }), SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsx("div", { style: { color: "#8b8b8b", fontSize: "11px", marginBottom: "8px" }, children: t('lan.examples') }) }), lanInfoData.examples && Object.entries(lanInfoData.examples).map(([lang, cmd]) => (SP_JSX.jsxs(SP_REACT.Fragment, { children: [SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsx("code", { style: { display: "block", width: "100%", boxSizing: "border-box", fontSize: "10px", background: "#1a1a1a", padding: "4px 8px", borderRadius: "4px", color: "#22c55e", whiteSpace: "pre-wrap", wordBreak: "break-all" }, children: cmd }) }), SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsx("div", { style: { marginBottom: "8px" }, children: SP_JSX.jsx(FocusBtn, { onClick: () => navigator.clipboard.writeText(cmd), disabled: busy, children: t('lan.btn.copy') }) }) })] }, lang)))] })) : (SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsx("div", { style: { color: "#8b8b8b", fontSize: "12px", marginBottom: "8px" }, children: t('lan.loading') }) }))] })) : null, status.models.length > 0 ? (SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsx("div", { style: { marginBottom: "8px" }, children: SP_JSX.jsxs(FocusBtn, { onClick: () => openModelsModal({ models: status.models }), children: [SP_JSX.jsx(FaTrash, { style: { marginRight: "6px", verticalAlign: "middle" } }), t('models.title')] }) }) })) : (SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsx("div", { style: { color: "#8b8b8b", fontSize: "12px", marginBottom: "8px" }, children: t('models.empty') }) })), status.error ? (SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsx("div", { style: { color: "#f43f5e", fontSize: "12px", marginBottom: "8px" }, children: status.error }) })) : null, status.service_active && (SP_JSX.jsxs(DFL.PanelSection, { title: t('library.title'), children: [SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsx("div", { style: { color: "#8b8b8b", fontSize: "12px", marginBottom: "8px" }, children: t('library.desc') }) }), SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsx("input", { type: "text", value: librarySearch, onChange: (e) => setLibrarySearch(e.target.value), placeholder: t('library.search.placeholder'), style: {
                                 width: "100%",
                                 boxSizing: "border-box",
                                 padding: "8px",
@@ -963,16 +1011,7 @@ function Content() {
                                         cursor: "pointer",
                                         whiteSpace: "nowrap",
                                     }, children: t(tagKey) }, tag));
-                            }) }) }), libraryLoading ? (SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsx("div", { style: { color: "#8b8b8b", fontSize: "12px", textAlign: "center", padding: "16px" }, children: t('library.loading') }) })) : (SP_JSX.jsx(SP_JSX.Fragment, { children: libraryResults.length > 0 ? (libraryResults.map((m) => (SP_JSX.jsxs(SP_REACT.Fragment, { children: [SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsxs("div", { style: { marginBottom: "8px" }, children: [SP_JSX.jsx("div", { style: { color: "#e6e6e6", fontWeight: 500 }, children: m.name }), SP_JSX.jsx("div", { style: { color: "#8b8b8b", fontSize: "11px" }, children: m.description }), SP_JSX.jsx("div", { style: { display: "flex", gap: "4px", marginTop: "4px" }, children: m.tags.map((t) => (SP_JSX.jsx("span", { style: { fontSize: "10px", padding: "2px 6px", background: "#22c55e22", borderRadius: "3px", color: "#22c55e" }, children: t }, t))) })] }) }), SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsx("div", { style: { marginBottom: "8px" }, children: SP_JSX.jsx(FocusBtn, { onClick: () => doLibraryInstall(m.name), disabled: busy, children: t('library.btn.install') }) }) })] }, m.name)))) : (SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsx("div", { style: { color: "#8b8b8b", fontSize: "12px", textAlign: "center", padding: "16px" }, children: t('library.empty') }) })) })), SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsx("div", { style: { color: "#8b8b8b", fontSize: "11px", marginTop: "8px" }, children: t('library.hint') }) })] })), status.service_active && (SP_JSX.jsxs(DFL.PanelSection, { title: t('rag.title'), children: [SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsx("div", { style: { color: "#8b8b8b", fontSize: "12px", marginBottom: "8px" }, children: t('rag.desc') }) }), SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsx("input", { type: "text", value: ragDirInput, onChange: (e) => setRagDirInput(e.target.value), placeholder: t('rag.dir.placeholder'), style: {
-                                width: "100%",
-                                boxSizing: "border-box",
-                                padding: "8px",
-                                borderRadius: "4px",
-                                border: "1px solid #4a4a4a",
-                                background: "#1a1a1a",
-                                color: "#fafafa",
-                                fontSize: "14px",
-                            } }) }), SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsx("div", { style: { marginBottom: "8px" }, children: SP_JSX.jsx(FocusBtn, { onClick: doRagDirSave, disabled: busy, children: t('rag.btn.save') }) }) }), ragConfig && (SP_JSX.jsxs(SP_JSX.Fragment, { children: [SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsx("div", { style: { color: "#8b8b8b", fontSize: "11px", marginBottom: "8px" }, children: t('rag.current', { dir: ragConfig.rag_documents_dir || 'not defined' }) }) }), SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsx("div", { style: { color: "#8b8b8b", fontSize: "12px", marginBottom: "8px", marginTop: "8px" }, children: t('rag.embedding.title') }) }), ragConfig.installed_embedding_models.length > 0 ? (SP_JSX.jsxs(SP_JSX.Fragment, { children: [SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsx("div", { style: { color: "#e6e6e6", fontSize: "12px", marginBottom: "4px" }, children: t('rag.embedding.installed', { models: ragConfig.installed_embedding_models.join(", ") }) }) }), ragConfig.rag_embedding_model ? (SP_JSX.jsxs(SP_JSX.Fragment, { children: [SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsx("div", { style: { color: "#e6e6e6", fontSize: "12px", marginBottom: "4px" }, children: t('rag.embedding.active', { model: ragConfig.rag_embedding_model }) }) }), ragConfig.installed_embedding_models.filter((m) => m !== ragConfig.rag_embedding_model).map((m) => (SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsx("div", { style: { marginBottom: "8px" }, children: SP_JSX.jsx(FocusBtn, { onClick: () => doRagModelSet(m), disabled: busy, children: t('rag.embedding.btn.use', { model: m }) }) }) }, m)))] })) : (SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsx("div", { style: { display: "flex", gap: "8px", flexWrap: "wrap", marginBottom: "8px" }, children: ragConfig.installed_embedding_models.map((m) => (SP_JSX.jsx(FocusBtn, { onClick: () => doRagModelSet(m), disabled: busy, children: t('rag.embedding.btn.use', { model: m }) }, m))) }) }))] })) : (SP_JSX.jsxs(SP_JSX.Fragment, { children: [SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsx("div", { style: { color: "#f43f5e", fontSize: "11px", padding: "8px", background: "#f43f5e11", borderRadius: "4px", border: "1px solid #f43f5e33", marginBottom: "8px" }, children: t('rag.embedding.none') }) }), ragConfig.recommended_embedding_model && (SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsx("div", { style: { marginBottom: "8px" }, children: SP_JSX.jsx(FocusBtn, { onClick: doRagModelInstall, disabled: busy || ragModelInstalling, children: ragModelInstalling ? t('rag.embedding.installing') : t('rag.embedding.btn.install', { model: ragConfig.recommended_embedding_model }) }) }) }))] }))] }))] })), status.service_active && (SP_JSX.jsxs(DFL.PanelSection, { title: t('persona.title'), children: [SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsx("div", { style: { color: "#8b8b8b", fontSize: "12px", marginBottom: "8px" }, children: t('persona.desc') }) }), SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsx("input", { type: "text", value: personaName || persona.name, onChange: (e) => setPersonaName(e.target.value), placeholder: t('persona.name.placeholder'), style: {
+                            }) }) }), libraryLoading ? (SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsx("div", { style: { color: "#8b8b8b", fontSize: "12px", textAlign: "center", padding: "16px" }, children: t('library.loading') }) })) : (SP_JSX.jsx(SP_JSX.Fragment, { children: libraryResults.length > 0 ? (libraryResults.map((m) => (SP_JSX.jsxs(SP_REACT.Fragment, { children: [SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsxs("div", { style: { marginBottom: "8px" }, children: [SP_JSX.jsx("div", { style: { color: "#e6e6e6", fontWeight: 500 }, children: m.name }), SP_JSX.jsx("div", { style: { color: "#8b8b8b", fontSize: "11px" }, children: m.description }), SP_JSX.jsx("div", { style: { display: "flex", gap: "4px", marginTop: "4px" }, children: m.tags.map((t) => (SP_JSX.jsx("span", { style: { fontSize: "10px", padding: "2px 6px", background: "#22c55e22", borderRadius: "3px", color: "#22c55e" }, children: t }, t))) })] }) }), SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsx("div", { style: { marginBottom: "8px" }, children: SP_JSX.jsx(FocusBtn, { onClick: () => doLibraryInstall(m.name), disabled: busy, children: t('library.btn.install') }) }) })] }, m.name)))) : (SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsx("div", { style: { color: "#8b8b8b", fontSize: "12px", textAlign: "center", padding: "16px" }, children: t('library.empty') }) })) })), SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsx("div", { style: { color: "#8b8b8b", fontSize: "11px", marginTop: "8px" }, children: t('library.hint') }) })] })), status.service_active && (SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsx("div", { style: { marginBottom: "8px" }, children: SP_JSX.jsxs(FocusBtn, { onClick: () => openRagModal({ config: ragConfig ? { rag_dir: ragConfig.rag_documents_dir, installed_embedding_models: ragConfig.installed_embedding_models, current_embedding_model: ragConfig.rag_embedding_model ?? null } : { rag_dir: ragDirInput, installed_embedding_models: [], current_embedding_model: null } }), children: [SP_JSX.jsx(FaDownload, { style: { marginRight: "6px", verticalAlign: "middle" } }), t('rag.title')] }) }) })), status.service_active && (SP_JSX.jsxs(DFL.PanelSection, { title: t('persona.title'), children: [SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsx("div", { style: { color: "#8b8b8b", fontSize: "12px", marginBottom: "8px" }, children: t('persona.desc') }) }), SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsx("input", { type: "text", value: personaName || persona.name, onChange: (e) => setPersonaName(e.target.value), placeholder: t('persona.name.placeholder'), style: {
                                 width: "100%",
                                 boxSizing: "border-box",
                                 padding: "8px",

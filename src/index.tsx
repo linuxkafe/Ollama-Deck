@@ -10,6 +10,8 @@ import { callable, definePlugin, toaster } from "@decky/api";
 import { Fragment, useEffect, useState } from "react";
 import { FaRobot, FaDownload, FaTrash } from "react-icons/fa";
 import { t } from "./i18n";
+import { openRagModal } from "./components/RagModal";
+import { openModelsModal } from "./components/ModelsModal";
 import { openChatModal } from "./components/ChatModal";
 import { FocusBtn } from "./components/ui";
 
@@ -115,11 +117,9 @@ const setAutostart = callable<[on: boolean], { ok: boolean }>("set_autostart");
 const setKeepAwake = callable<[on: boolean], { ok: boolean }>("set_keep_awake");
 const updateAll = callable<[], UpdateResult>("update_all");
 const pullModel = callable<[tag: string], { ok: boolean; error?: string }>("pull_model");
-const deleteModel = callable<[tag: string], { ok: boolean; error?: string }>("delete_model");
 const lanInfo = callable<[], LanInfoResult>("lan_info");
 const searchModels = callable<[query?: string, tags?: string[]], SearchModelsResult>("search_models");
 const getRagConfig = callable<[], RagConfigResult>("get_rag_config");
-const setRagConfig = callable<[documents_dir?: string, embedding_model?: string], RagConfigResult>("set_rag_config");
 const setNetworkExposure = callable<[expose: boolean], NetworkExposureResult>("set_network_exposure");
 const getPersona = callable<[], PersonaResult>("get_persona");
 const setPersona = callable<[persona: Persona], PersonaResult>("set_persona");
@@ -132,17 +132,7 @@ const DEFAULT_PERSONA: Persona = {
   model: "",
 };
 
-function formatSize(size: number): string {
-  const units = ["B", "KB", "MB", "GB", "TB"];
-  let value = size;
-  for (let i = 0; i < units.length; i++) {
-    if (value < 1024 || i === units.length - 1) {
-      return `${value.toFixed(1)} ${units[i]}`;
-    }
-    value /= 1024;
-  }
-  return `${value.toFixed(1)} TB`;
-}
+
 
 function StatusDot({ ok }: { ok: boolean }) {
   return (
@@ -165,7 +155,6 @@ function Content() {
   const [busy, setBusy] = useState(false);
   const [pullModalOpen, setPullModalOpen] = useState(false);
   const [pullModelName, setPullModelName] = useState("");
-  const [deleteConfirm, setDeleteConfirm] = useState<string | null>(null);
   const [chatModel, setChatModel] = useState("");
   const [lanInfoData, setLanInfoData] = useState<LanInfoResult | null>(null);
   const [lanInfoLoaded, setLanInfoLoaded] = useState(false);
@@ -175,7 +164,6 @@ function Content() {
   const [libraryLoading, setLibraryLoading] = useState(false);
   const [ragConfig, setRagConfigState] = useState<RagConfigResult | null>(null);
   const [ragDirInput, setRagDirInput] = useState("");
-  const [ragModelInstalling, setRagModelInstalling] = useState(false);
   const [networkExpose, setNetworkExpose] = useState(false);
   const [webSearchEnabled] = useState(true);
   const [persona, setPersonaState] = useState<Persona>(DEFAULT_PERSONA);
@@ -259,35 +247,6 @@ function Content() {
     } catch (err) {
       toaster.toast({
         title: t('toast.pull.failed'),
-        body: String(err),
-        critical: true,
-      });
-    } finally {
-      setBusy(false);
-      await refresh();
-    }
-  };
-
-  const doDelete = async (tag: string) => {
-    setDeleteConfirm(null);
-    setBusy(true);
-    try {
-      const res = await deleteModel(tag);
-      if (!res.ok) {
-        toaster.toast({
-          title: t('toast.delete.failed'),
-          body: res.error || t('toast.delete.error', { model: tag }),
-          critical: true,
-        });
-      } else {
-        toaster.toast({
-          title: t('toast.model.removed'),
-          body: tag,
-        });
-      }
-    } catch (err) {
-      toaster.toast({
-        title: t('toast.delete.failed'),
         body: String(err),
         critical: true,
       });
@@ -381,65 +340,6 @@ function Content() {
     } finally {
       setBusy(false);
       await refresh();
-    }
-  };
-
-  const doRagDirSave = async () => {
-    setBusy(true);
-    try {
-      const res = await setRagConfig(ragDirInput.trim() || undefined, undefined);
-      if (!res.ok) {
-        toaster.toast({
-          title: t('toast.save.failed'),
-          body: res.error || t('toast.save.error'),
-          critical: true,
-        });
-      } else {
-        toaster.toast({ title: t('toast.rag.dir.saved'), body: res.rag_documents_dir });
-        setRagConfigState(res);
-      }
-    } catch (err) {
-      toaster.toast({ title: t('toast.save.failed'), body: String(err), critical: true });
-    } finally {
-      setBusy(false);
-    }
-  };
-
-  const doRagModelInstall = async () => {
-    if (!ragConfig?.recommended_embedding_model) return;
-    setRagModelInstalling(true);
-    setBusy(true);
-    try {
-      const model = ragConfig.recommended_embedding_model;
-      const res = await pullModel(model);
-      if (!res.ok) {
-        toaster.toast({ title: t('toast.rag.install.failed'), body: res.error || t('toast.rag.install.error'), critical: true });
-      } else {
-        toaster.toast({ title: t('toast.rag.embedding.installed'), body: model });
-        await loadRagConfig();
-      }
-    } catch (err) {
-      toaster.toast({ title: t('toast.rag.install.failed'), body: String(err), critical: true });
-    } finally {
-      setRagModelInstalling(false);
-      setBusy(false);
-    }
-  };
-
-  const doRagModelSet = async (model: string) => {
-    setBusy(true);
-    try {
-      const res = await setRagConfig(undefined, model);
-      if (!res.ok) {
-        toaster.toast({ title: t('toast.rag.set.failed'), body: res.error || t('toast.rag.set.failed'), critical: true });
-      } else {
-        toaster.toast({ title: t('toast.rag.embedding.set'), body: model });
-        setRagConfigState(res);
-      }
-    } catch (err) {
-      toaster.toast({ title: t('toast.rag.set.failed'), body: String(err), critical: true });
-    } finally {
-      setBusy(false);
     }
   };
 
@@ -738,55 +638,14 @@ function Content() {
       ) : null}
 
       {status.models.length > 0 ? (
-        <PanelSection title={t('models.title')}>
-          {status.models.map((m) => (
-            <Fragment key={m.name}>
-              <PanelSectionRow>
-                <div
-                  style={{
-                    display: "flex",
-                    justifyContent: "space-between",
-                    alignItems: "center",
-                    color: "#e6e6e6"
-                  }}
-                >
-                  <span>{m.name}</span>
-                  <span style={{ color: "#8b8b8b" }}>
-                    {m.family} · {formatSize(m.size)}
-                  </span>
-                </div>
-              </PanelSectionRow>
-              {deleteConfirm === m.name ? (
-                <PanelSectionRow>
-                  <div style={{ display: "flex", gap: "8px", flexWrap: "wrap", marginBottom: "8px" }}>
-                    <FocusBtn
-                      onClick={() => setDeleteConfirm(null)}
-                    >
-                      {t('delete.btn.cancel')}
-                    </FocusBtn>
-                    <FocusBtn
-                      onClick={() => doDelete(m.name)}
-                    >
-                      {t('delete.btn.confirm')}
-                    </FocusBtn>
-                  </div>
-                </PanelSectionRow>
-              ) : (
-                <PanelSectionRow>
-                  <div style={{ marginBottom: "8px" }}>
-                    <FocusBtn
-                      disabled={busy}
-                      onClick={() => setDeleteConfirm(m.name)}
-                      style={{ color: "#f43f5e" }}
-                    >
-                      <FaTrash style={{ marginRight: "4px", verticalAlign: "middle" }} />
-                    </FocusBtn>
-                  </div>
-                </PanelSectionRow>
-              )}
-            </Fragment>
-          ))}
-        </PanelSection>
+        <PanelSectionRow>
+          <div style={{ marginBottom: "8px" }}>
+            <FocusBtn onClick={() => openModelsModal({ models: status.models })}>
+              <FaTrash style={{ marginRight: "6px", verticalAlign: "middle" }} />
+              {t('models.title')}
+            </FocusBtn>
+          </div>
+        </PanelSectionRow>
       ) : (
         <PanelSectionRow>
           <div style={{ color: "#8b8b8b", fontSize: "12px", marginBottom: "8px" }}>
@@ -923,116 +782,14 @@ function Content() {
       )}
 
       {status.service_active && (
-        <PanelSection title={t('rag.title')}>
-          <PanelSectionRow>
-            <div style={{ color: "#8b8b8b", fontSize: "12px", marginBottom: "8px" }}>
-              {t('rag.desc')}
-            </div>
-          </PanelSectionRow>
-          <PanelSectionRow>
-            <input
-              type="text"
-              value={ragDirInput}
-              onChange={(e) => setRagDirInput(e.target.value)}
-              placeholder={t('rag.dir.placeholder')}
-              style={{
-                width: "100%",
-                boxSizing: "border-box",
-                padding: "8px",
-                borderRadius: "4px",
-                border: "1px solid #4a4a4a",
-                background: "#1a1a1a",
-                color: "#fafafa",
-                fontSize: "14px",
-              }}
-            />
-          </PanelSectionRow>
-          <PanelSectionRow>
-            <div style={{ marginBottom: "8px" }}>
-              <FocusBtn onClick={doRagDirSave} disabled={busy}>
-                {t('rag.btn.save')}
-              </FocusBtn>
-            </div>
-          </PanelSectionRow>
-          {ragConfig && (
-            <>
-              <PanelSectionRow>
-                <div style={{ color: "#8b8b8b", fontSize: "11px", marginBottom: "8px" }}>
-                  {t('rag.current', { dir: ragConfig.rag_documents_dir || 'not defined' })}
-                </div>
-              </PanelSectionRow>
-              <PanelSectionRow>
-                <div style={{ color: "#8b8b8b", fontSize: "12px", marginBottom: "8px", marginTop: "8px" }}>
-                  {t('rag.embedding.title')}
-                </div>
-              </PanelSectionRow>
-              {ragConfig.installed_embedding_models.length > 0 ? (
-                <>
-                  <PanelSectionRow>
-                    <div style={{ color: "#e6e6e6", fontSize: "12px", marginBottom: "4px" }}>
-                      {t('rag.embedding.installed', { models: ragConfig.installed_embedding_models.join(", ") })}
-                    </div>
-                  </PanelSectionRow>
-                  {ragConfig.rag_embedding_model ? (
-                    <>
-                      <PanelSectionRow>
-                        <div style={{ color: "#e6e6e6", fontSize: "12px", marginBottom: "4px" }}>
-                          {t('rag.embedding.active', { model: ragConfig.rag_embedding_model })}
-                        </div>
-                      </PanelSectionRow>
-                      {ragConfig.installed_embedding_models.filter((m) => m !== ragConfig.rag_embedding_model).map((m) => (
-                        <PanelSectionRow key={m}>
-                          <div style={{ marginBottom: "8px" }}>
-                            <FocusBtn
-                              onClick={() => doRagModelSet(m)}
-                              disabled={busy}
-                            >
-                              {t('rag.embedding.btn.use', { model: m })}
-                            </FocusBtn>
-                          </div>
-                        </PanelSectionRow>
-                      ))}
-                    </>
-                  ) : (
-                    <PanelSectionRow>
-                      <div style={{ display: "flex", gap: "8px", flexWrap: "wrap", marginBottom: "8px" }}>
-                        {ragConfig.installed_embedding_models.map((m) => (
-                          <FocusBtn
-                            key={m}
-                            onClick={() => doRagModelSet(m)}
-                            disabled={busy}
-                          >
-                            {t('rag.embedding.btn.use', { model: m })}
-                          </FocusBtn>
-                        ))}
-                      </div>
-                    </PanelSectionRow>
-                  )}
-                </>
-              ) : (
-                <>
-                  <PanelSectionRow>
-                    <div style={{ color: "#f43f5e", fontSize: "11px", padding: "8px", background: "#f43f5e11", borderRadius: "4px", border: "1px solid #f43f5e33", marginBottom: "8px" }}>
-                      {t('rag.embedding.none')}
-                    </div>
-                  </PanelSectionRow>
-                  {ragConfig.recommended_embedding_model && (
-                    <PanelSectionRow>
-                      <div style={{ marginBottom: "8px" }}>
-                        <FocusBtn
-                          onClick={doRagModelInstall}
-                          disabled={busy || ragModelInstalling}
-                        >
-                          {ragModelInstalling ? t('rag.embedding.installing') : t('rag.embedding.btn.install', { model: ragConfig.recommended_embedding_model })}
-                        </FocusBtn>
-                      </div>
-                    </PanelSectionRow>
-                  )}
-                </>
-              )}
-            </>
-          )}
-        </PanelSection>
+        <PanelSectionRow>
+          <div style={{ marginBottom: "8px" }}>
+            <FocusBtn onClick={() => openRagModal({ config: ragConfig ? { rag_dir: ragConfig.rag_documents_dir, installed_embedding_models: ragConfig.installed_embedding_models, current_embedding_model: ragConfig.rag_embedding_model ?? null } : { rag_dir: ragDirInput, installed_embedding_models: [], current_embedding_model: null } })}>
+              <FaDownload style={{ marginRight: "6px", verticalAlign: "middle" }} />
+              {t('rag.title')}
+            </FocusBtn>
+          </div>
+        </PanelSectionRow>
       )}
 
       {status.service_active && (
