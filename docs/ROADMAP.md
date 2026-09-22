@@ -16,6 +16,7 @@
 - [x] T017 Botões compactos (native Btn) e zero flex-end — nada à direita
 - [x] T018 Chat popout sem action icons à direita (bHideActionIcons) + auditoria PT/EN
 - [x] T019 Btn blindado contra CSS global (width:auto) + chat sem botão Enviar (Enter)
+- [x] T020 install.sh: remover .bak.* que a Decky carregava como plugin antigo
 
 ## Backlog
 | Item | Impacto | Esforço | Prioridade | Estado |

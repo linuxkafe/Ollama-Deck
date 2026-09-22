@@ -181,3 +181,19 @@ Registo de aprendizagens relevantes da análise hostil (fase de plan).
   textarea.
 - **Applied To**: `src/components/ChatModal.tsx`.
 - **Date**: 2026-09-22
+
+## [Ops] — "nada mudou" ao re-instalar: o Decky serve o .bak, não o ativo
+- **Task**: T020
+- **Insight**: o install.sh fazia `mv $dest $backup` em cada execução e nunca limpava os
+  backups. Como cada `.bak.*` contém `plugin.json` + `main.py` + `dist/` válidos, o scanner
+  do Decky loader "found plugin: ollama-deck.bak.…" e **servia o código do backup antigo**
+  — por isso o utilizador viu as mesmas correções (T013..T019) "tudo igual", apesar de o
+  dist ativo no disco estar correto. Rigor: verificar o processo a correr
+  (`pgrep -af main.py` → caminho) e os logs do loader, não só o hash dos ficheiros.
+- **Origin**: ssh ao Deck + journalctl -u plugin_loader; processo PID 164180 a correr de
+  `.bak.20260921205846` (cópia 21/09).
+- **Impact**: instalador passa a remover todos `ollama-deck.bak.*`; invariante = 1 dir
+  ativo. Lição geral: cache/backups em diretórios vigiados por scanners podem mascarar
+  deploys "certos".
+- **Applied To**: `install.sh`.
+- **Date**: 2026-09-22
