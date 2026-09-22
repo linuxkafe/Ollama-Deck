@@ -219,7 +219,7 @@ function ChatModal({
         <div ref={listEndRef} />
       </div>
       <div style={{ padding: "16px", borderTop: "1px solid #4a4a4a", background: "#1a1a1a" }}>
-        <div style={{ display: "flex", gap: "12px", alignItems: "flex-end" }}>
+        <div style={{ display: "flex", flexDirection: "column", gap: "10px" }}>
           <textarea
             ref={inputRef}
             value={input}
@@ -235,8 +235,7 @@ function ChatModal({
             autoFocus
             rows={1}
             style={{
-              flex: 1,
-              minWidth: 0,
+              width: "100%",
               boxSizing: "border-box",
               resize: "none",
               overflow: "hidden",
@@ -250,9 +249,11 @@ function ChatModal({
               maxHeight: "140px",
             }}
           />
-          <ButtonItem layout="inline" onClick={() => handleSend()} disabled={busy || !input.trim() || !model}>
-            {t("chat.btn.send")}
-          </ButtonItem>
+          <div style={{ display: "flex", justifyContent: "flex-end" }}>
+            <ButtonItem layout="inline" onClick={() => handleSend()} disabled={busy || !input.trim() || !model}>
+              {t("chat.btn.send")}
+            </ButtonItem>
+          </div>
         </div>
       </div>
     </div>

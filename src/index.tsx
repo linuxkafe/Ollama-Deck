@@ -6,7 +6,7 @@ import {
   staticClasses
 } from "@decky/ui";
 import { callable, definePlugin, toaster } from "@decky/api";
-import { useEffect, useState } from "react";
+import { Fragment, useEffect, useState } from "react";
 import { FaRobot, FaDownload, FaTrash } from "react-icons/fa";
 import { t } from "./i18n";
 import { openChatModal } from "./components/ChatModal";
@@ -708,16 +708,20 @@ function Content() {
                 </div>
               </PanelSectionRow>
               {lanInfoData.examples && Object.entries(lanInfoData.examples).map(([lang, cmd]) => (
-                <PanelSectionRow key={lang}>
-                  <div style={{ display: "flex", gap: "8px", alignItems: "center", marginBottom: "8px" }}>
-                    <code style={{ flex: 1, fontSize: "10px", background: "#1a1a1a", padding: "4px 8px", borderRadius: "4px", color: "#22c55e", whiteSpace: "pre-wrap", wordBreak: "break-all" }}>
+                <Fragment key={lang}>
+                  <PanelSectionRow>
+                    <code style={{ display: "block", width: "100%", boxSizing: "border-box", fontSize: "10px", background: "#1a1a1a", padding: "4px 8px", borderRadius: "4px", color: "#22c55e", whiteSpace: "pre-wrap", wordBreak: "break-all" }}>
                       {cmd}
                     </code>
-                    <ButtonItem layout="inline" onClick={() => navigator.clipboard.writeText(cmd)} disabled={busy}>
-                      {t('lan.btn.copy')}
-                    </ButtonItem>
-                  </div>
-                </PanelSectionRow>
+                  </PanelSectionRow>
+                  <PanelSectionRow>
+                    <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: "8px" }}>
+                      <ButtonItem layout="inline" onClick={() => navigator.clipboard.writeText(cmd)} disabled={busy}>
+                        {t('lan.btn.copy')}
+                      </ButtonItem>
+                    </div>
+                  </PanelSectionRow>
+                </Fragment>
               ))}
             </>
           ) : (
@@ -731,33 +735,25 @@ function Content() {
       {status.models.length > 0 ? (
         <PanelSection title={t('models.title')}>
           {status.models.map((m) => (
-            <PanelSectionRow key={m.name}>
-              <div
-                style={{
-                  display: "flex",
-                  justifyContent: "space-between",
-                  alignItems: "center",
-                  color: "#e6e6e6"
-                }}
-              >
-                <span>{m.name}</span>
-                <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+            <Fragment key={m.name}>
+              <PanelSectionRow>
+                <div
+                  style={{
+                    display: "flex",
+                    justifyContent: "space-between",
+                    alignItems: "center",
+                    color: "#e6e6e6"
+                  }}
+                >
+                  <span>{m.name}</span>
                   <span style={{ color: "#8b8b8b" }}>
                     {m.family} · {formatSize(m.size)}
                   </span>
-                  <ButtonItem
-                    layout="inline"
-                    disabled={busy || deleteConfirm === m.name}
-                    onClick={() => setDeleteConfirm(m.name)}
-                    description={t('delete.desc')}
-                  >
-                    <FaTrash style={{ marginRight: "4px", verticalAlign: "middle" }} />
-                  </ButtonItem>
                 </div>
-              </div>
-              {deleteConfirm === m.name && (
+              </PanelSectionRow>
+              {deleteConfirm === m.name ? (
                 <PanelSectionRow>
-                  <div style={{ display: "flex", gap: "8px", justifyContent: "flex-end" }}>
+                  <div style={{ display: "flex", gap: "8px", justifyContent: "flex-end", marginBottom: "8px" }}>
                     <ButtonItem
                       layout="inline"
                       onClick={() => setDeleteConfirm(null)}
@@ -772,8 +768,21 @@ function Content() {
                     </ButtonItem>
                   </div>
                 </PanelSectionRow>
+              ) : (
+                <PanelSectionRow>
+                  <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: "8px" }}>
+                    <ButtonItem
+                      layout="inline"
+                      disabled={busy}
+                      onClick={() => setDeleteConfirm(m.name)}
+                      description={t('delete.desc')}
+                    >
+                      <FaTrash style={{ marginRight: "4px", verticalAlign: "middle" }} />
+                    </ButtonItem>
+                  </div>
+                </PanelSectionRow>
               )}
-            </PanelSectionRow>
+            </Fragment>
           ))}
         </PanelSection>
       ) : (
@@ -859,9 +868,9 @@ function Content() {
             <>
               {libraryResults.length > 0 ? (
                 libraryResults.map((m) => (
-                  <PanelSectionRow key={m.name}>
-                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "8px" }}>
-                      <div>
+                  <Fragment key={m.name}>
+                    <PanelSectionRow>
+                      <div style={{ marginBottom: "8px" }}>
                         <div style={{ color: "#e6e6e6", fontWeight: 500 }}>{m.name}</div>
                         <div style={{ color: "#8b8b8b", fontSize: "11px" }}>
                           {m.description}
@@ -874,16 +883,20 @@ function Content() {
                           ))}
                         </div>
                       </div>
-                      <ButtonItem
-                        layout="inline"
-                        onClick={() => doLibraryInstall(m.name)}
-                        disabled={busy}
-                        description={t('library.btn.install.desc', { name: m.name })}
-                      >
-                        {t('library.btn.install')}
-                      </ButtonItem>
-                    </div>
-                  </PanelSectionRow>
+                    </PanelSectionRow>
+                    <PanelSectionRow>
+                      <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: "8px" }}>
+                        <ButtonItem
+                          layout="inline"
+                          onClick={() => doLibraryInstall(m.name)}
+                          disabled={busy}
+                          description={t('library.btn.install.desc', { name: m.name })}
+                        >
+                          {t('library.btn.install')}
+                        </ButtonItem>
+                      </div>
+                    </PanelSectionRow>
+                  </Fragment>
                 ))
               ) : (
                 <PanelSectionRow>
@@ -916,8 +929,7 @@ function Content() {
               onChange={(e) => setRagDirInput(e.target.value)}
               placeholder={t('rag.dir.placeholder')}
               style={{
-                flex: 1,
-                minWidth: 0,
+                width: "100%",
                 boxSizing: "border-box",
                 padding: "8px",
                 borderRadius: "4px",
@@ -927,9 +939,13 @@ function Content() {
                 fontSize: "14px",
               }}
             />
-            <ButtonItem layout="inline" onClick={doRagDirSave} disabled={busy}>
-              {t('rag.btn.save')}
-            </ButtonItem>
+          </PanelSectionRow>
+          <PanelSectionRow>
+            <div style={{ display: "flex", justifyContent: "flex-end" }}>
+              <ButtonItem layout="inline" onClick={doRagDirSave} disabled={busy}>
+                {t('rag.btn.save')}
+              </ButtonItem>
+            </div>
           </PanelSectionRow>
           {ragConfig && (
             <>
@@ -951,21 +967,26 @@ function Content() {
                     </div>
                   </PanelSectionRow>
                   {ragConfig.rag_embedding_model ? (
-                    <PanelSectionRow>
-                      <div style={{ display: "flex", gap: "8px", alignItems: "center", marginBottom: "8px" }}>
-                        <span style={{ color: "#e6e6e6" }}>{t('rag.embedding.active', { model: ragConfig.rag_embedding_model })}</span>
-                        {ragConfig.installed_embedding_models.filter((m) => m !== ragConfig.rag_embedding_model).map((m) => (
-                          <ButtonItem
-                            key={m}
-                            layout="inline"
-                            onClick={() => doRagModelSet(m)}
-                            disabled={busy}
-                          >
-                            {t('rag.embedding.btn.use', { model: m })}
-                          </ButtonItem>
-                        ))}
-                      </div>
-                    </PanelSectionRow>
+                    <>
+                      <PanelSectionRow>
+                        <div style={{ color: "#e6e6e6", fontSize: "12px", marginBottom: "4px" }}>
+                          {t('rag.embedding.active', { model: ragConfig.rag_embedding_model })}
+                        </div>
+                      </PanelSectionRow>
+                      {ragConfig.installed_embedding_models.filter((m) => m !== ragConfig.rag_embedding_model).map((m) => (
+                        <PanelSectionRow key={m}>
+                          <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: "8px" }}>
+                            <ButtonItem
+                              layout="inline"
+                              onClick={() => doRagModelSet(m)}
+                              disabled={busy}
+                            >
+                              {t('rag.embedding.btn.use', { model: m })}
+                            </ButtonItem>
+                          </div>
+                        </PanelSectionRow>
+                      ))}
+                    </>
                   ) : (
                     <PanelSectionRow>
                       <div style={{ display: "flex", gap: "8px", marginBottom: "8px" }}>
