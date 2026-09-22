@@ -400,9 +400,10 @@ function ChatModal({ models, initialModel, initialPersona, initialWebSearch, }) 
     }, [input]);
     SP_REACT.useEffect(() => {
         // Focus the textarea after the popout mounts so the SteamOS on-screen keyboard appears
-        requestAnimationFrame(() => {
+        const timer = setTimeout(() => {
             inputRef.current?.focus();
-        });
+        }, 200);
+        return () => clearTimeout(timer);
     }, []);
     const handleSend = async () => {
         if (!input.trim() || !model || busy)
