@@ -101,3 +101,19 @@ Registo de aprendizagens relevantes da análise hostil (fase de plan).
 - **Applied To**: fluxo de publicação/release do projeto; verificação pós-push faz parte
   do Phase 4 (download do archive + `ls` + grep do dist).
 - **Date**: 2026-09-22
+
+## [UI] — Regra de layout: nunca colocar botões à direita de campos
+- **Task**: T015
+- **Insight**: report do utilizador: "não podem haver botões à direita, senão não há espaço
+  e é feita a deslocação à direita". Qualquer linha `campo + botão` num `PanelSectionRow` da
+  Decky/SteamOS pode perder espaço (o botão a largura de conteúdo rouba ao campo que não
+  encolhe) e o campo transborda à direita. A correção robusta, independente do mecanismo
+  flex do container, é **empilhar**: campo sozinho na linha a `width:100%` + `box-sizing:
+  border-box`; botões numa linha própria (footer `flex-end`). Campos lado-a-lado
+  (ex.: sliders persona) são seguros — a regra aplica-se a botões.
+- **Origin**: auditoria linha-a-linha de `src/` após o report do utilizador (6 composições).
+- **Impact**: deslocação à direita eliminada por construção; padrão simples de policiar
+  (grep `ButtonItem` a coabitar com input/select/textarea/code).
+- **Applied To**: ChatModal footer (Enviar), RAG dir (Guardar), LAN (Copiar), Biblioteca
+  (Instalar), Embedding (Usar), Modelos (Apagar/Confirmar).
+- **Date**: 2026-09-22

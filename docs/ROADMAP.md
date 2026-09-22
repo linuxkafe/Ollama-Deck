@@ -11,6 +11,7 @@
 - [x] T006 Model Search & Install + RAG Directory with Embedding Model Resolution
 - [x] T013 Chat em janela separada a ecrã completo (popout dimensionado) + layout sem deslocação
 - [x] T014 Publicação T013 no GitHub (main) — instalável via `curl install.sh`
+- [x] T015 Regra: sem botões à direita de campos (UI empilhado, campos 100%)
 
 ## Backlog
 | Item | Impacto | Esforço | Prioridade | Estado |
