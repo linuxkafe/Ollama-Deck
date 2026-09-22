@@ -88,3 +88,16 @@ Registo de aprendizagens relevantes da análise hostil (fase de plan).
 - **Impact**: eliminou a deslocação à direita no selector de modelo e nos inputs do painel.
 - **Applied To**: todos os inputs/selects/textarea do plugin (chat + painel).
 - **Date**: 2026-09-22
+
+## [Deploy] — O instalador consome o snapshot do branch `main`, não releases/tags
+- **Task**: T014
+- **Insight**: `install.sh` descarrega
+  `https://github.com/<user>/<repo>/archive/refs/heads/main.tar.gz` — publicar o plugin
+  é fazer `git push origin main` (e incluir `dist/index.js` no commit); releases/tags
+  GitHub não são necessários para o fluxo curl|sh. `.gitignore` com `aes/` garante que
+  os internals AES nunca entram no archive público.
+- **Origin**: leitura do `install.sh` do repo + verificação do archive de main pós-push.
+- **Impact**: o fluxo "instalar actualização" é só um push; sem PR/release overhead.
+- **Applied To**: fluxo de publicação/release do projeto; verificação pós-push faz parte
+  do Phase 4 (download do archive + `ls` + grep do dist).
+- **Date**: 2026-09-22

@@ -10,6 +10,7 @@
 ## Done (sprint-03)
 - [x] T006 Model Search & Install + RAG Directory with Embedding Model Resolution
 - [x] T013 Chat em janela separada a ecrã completo (popout dimensionado) + layout sem deslocação
+- [x] T014 Publicação T013 no GitHub (main) — instalável via `curl install.sh`
 
 ## Backlog
 | Item | Impacto | Esforço | Prioridade | Estado |
