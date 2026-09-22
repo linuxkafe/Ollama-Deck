@@ -140,6 +140,7 @@ const translations = {
         'lan.btn.copy': 'Copy',
         'lan.loading': 'Loading LAN info…',
         'models.title': 'Models',
+        'models.manage': 'Manage Models',
         'models.empty': 'No models — start service to list.',
         'library.title': 'Model Library',
         'library.desc': 'Search and install models from Ollama library',
@@ -263,6 +264,7 @@ const translations = {
         'lan.btn.copy': 'Copiar',
         'lan.loading': 'A carregar informação LAN…',
         'models.title': 'Modelos',
+        'models.manage': 'Gerir Modelos',
         'models.empty': 'Nenhum modelo — liga o serviço para listar.',
         'library.title': 'Biblioteca de Modelos',
         'library.desc': 'Pesquisar e instalar modelos da biblioteca Ollama',
@@ -592,36 +594,40 @@ function ChatModal({ models, initialModel, initialPersona, initialWebSearch, }) 
         resizeInput();
     }, [input]);
     SP_REACT.useEffect(() => {
-        // Multi-strategy focus to trigger SteamOS virtual keyboard
-        setTimeout(() => {
-            const el = inputRef.current;
-            if (!el)
+        // Wait until the popout window actually has focus, then focus textarea + trigger keyboard
+        let cancelled = false;
+        const maxWait = 5000; // ms
+        const interval = 100;
+        const start = Date.now();
+        const tryFocus = () => {
+            if (cancelled)
                 return;
-            // Strategy 1: Ensure window has focus
-            window.focus();
-            // Strategy 2: Focus the element
-            el.focus();
-            // Strategy 3: Try Virtual Keyboard API (web standard)
-            const nav = navigator;
-            if (nav.virtualKeyboard && typeof nav.virtualKeyboard.show === 'function') {
-                nav.virtualKeyboard.show().catch(() => { });
+            if (document.hasFocus()) {
+                const el = inputRef.current;
+                if (!el)
+                    return;
+                window.focus();
+                el.focus();
+                const nav = navigator;
+                if (nav.virtualKeyboard && typeof nav.virtualKeyboard.show === 'function') {
+                    nav.virtualKeyboard.show().catch(() => { });
+                }
+                const win = window;
+                if (win.SteamClient?.showKeyboard)
+                    win.SteamClient.showKeyboard().catch(() => { });
+                if (win.Steam?.showKeyboard)
+                    win.Steam.showKeyboard().catch(() => { });
+                if (win.SteamUI?.showKeyboard)
+                    win.SteamUI.showKeyboard().catch(() => { });
+                el.click();
+                el.dispatchEvent(new FocusEvent('focus', { bubbles: true }));
             }
-            // Strategy 4: Try Steam client globals (SteamOS specific)
-            const win = window;
-            if (win.SteamClient?.showKeyboard) {
-                win.SteamClient.showKeyboard().catch(() => { });
+            else if (Date.now() - start < maxWait) {
+                setTimeout(tryFocus, interval);
             }
-            if (win.Steam?.showKeyboard) {
-                win.Steam.showKeyboard().catch(() => { });
-            }
-            if (win.SteamUI?.showKeyboard) {
-                win.SteamUI.showKeyboard().catch(() => { });
-            }
-            // Strategy 5: Click to trigger (some SteamOS versions)
-            el.click();
-            // Strategy 6: Dispatch focus event
-            el.dispatchEvent(new FocusEvent('focus', { bubbles: true }));
-        }, 500);
+        };
+        tryFocus();
+        return () => { cancelled = true; };
     }, []);
     const handleSend = async () => {
         if (!input.trim() || !model || busy)
@@ -997,7 +1003,7 @@ function Content() {
                                 ? t('updates.btn.update.desc.active')
                                 : t('updates.btn.update.desc.inactive'), children: [SP_JSX.jsx(FaDownload, { style: { marginRight: "8px", verticalAlign: "middle" } }), t('updates.btn.update')] }) }), SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsxs(DFL.ButtonItem, { layout: "below", disabled: busy || !status.service_active, onClick: () => setPullModalOpen(true), description: t('updates.btn.install.desc'), children: [SP_JSX.jsx(FaDownload, { style: { marginRight: "8px", verticalAlign: "middle" } }), t('updates.btn.install')] }) }), SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsx("div", { style: { color: "#8b8b8b", fontSize: "12px" }, children: busy
                                 ? t('updates.status.updating')
-                                : t('updates.status.idle', { version: status.version ?? "—", count: status.models.length }) }) })] }), status.service_active && status.models.length > 0 ? (SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsx("div", { style: { marginBottom: "8px" }, children: SP_JSX.jsxs(DFL.ButtonItem, { layout: "below", disabled: busy, onClick: handleOpenChat, description: t('chat.btn.open.desc'), children: [SP_JSX.jsx(FaRobot, { style: { marginRight: "8px", verticalAlign: "middle" } }), t('chat.btn.open')] }) }) })) : null, status.service_active ? (SP_JSX.jsxs(DFL.PanelSection, { title: t('lan.title'), children: [SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsx("div", { style: { color: "#8b8b8b", fontSize: "12px", marginBottom: "8px" }, children: t('lan.desc') }) }), lanInfoData ? (SP_JSX.jsxs(SP_JSX.Fragment, { children: [lanInfoData.warning && (SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsx("div", { style: { color: "#f43f5e", fontSize: "11px", padding: "8px", background: "#f43f5e11", borderRadius: "4px", border: "1px solid #f43f5e33", marginBottom: "8px" }, children: lanInfoData.warning }) })), SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsx("div", { style: { color: "#e6e6e6", fontSize: "12px", marginBottom: "8px" }, children: SP_JSX.jsx("strong", { children: t('lan.address', { url: lanInfoData.base_url ?? '' }) }) }) }), SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsx("div", { style: { color: "#8b8b8b", fontSize: "11px", marginBottom: "8px" }, children: t('lan.models', { models: lanInfoData.models?.join(", ") || 'none' }) }) }), SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsx("div", { style: { color: "#8b8b8b", fontSize: "11px", marginBottom: "8px" }, children: t('lan.examples') }) }), lanInfoData.examples && Object.entries(lanInfoData.examples).map(([lang, cmd]) => (SP_JSX.jsxs(SP_REACT.Fragment, { children: [SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsx("code", { style: { display: "block", width: "100%", boxSizing: "border-box", fontSize: "10px", background: "#1a1a1a", padding: "4px 8px", borderRadius: "4px", color: "#22c55e", whiteSpace: "pre-wrap", wordBreak: "break-all" }, children: cmd }) }), SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsx("div", { style: { marginBottom: "8px" }, children: SP_JSX.jsx(FocusBtn, { onClick: () => navigator.clipboard.writeText(cmd), disabled: busy, children: t('lan.btn.copy') }) }) })] }, lang)))] })) : (SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsx("div", { style: { color: "#8b8b8b", fontSize: "12px", marginBottom: "8px" }, children: t('lan.loading') }) }))] })) : null, status.models.length > 0 ? (SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsx("div", { style: { marginBottom: "8px" }, children: SP_JSX.jsxs(FocusBtn, { onClick: () => openModelsModal({ models: status.models }), children: [SP_JSX.jsx(FaTrash, { style: { marginRight: "6px", verticalAlign: "middle" } }), t('models.title')] }) }) })) : (SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsx("div", { style: { color: "#8b8b8b", fontSize: "12px", marginBottom: "8px" }, children: t('models.empty') }) })), status.error ? (SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsx("div", { style: { color: "#f43f5e", fontSize: "12px", marginBottom: "8px" }, children: status.error }) })) : null, status.service_active && (SP_JSX.jsxs(DFL.PanelSection, { title: t('library.title'), children: [SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsx("div", { style: { color: "#8b8b8b", fontSize: "12px", marginBottom: "8px" }, children: t('library.desc') }) }), SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsx("input", { type: "text", value: librarySearch, onChange: (e) => setLibrarySearch(e.target.value), placeholder: t('library.search.placeholder'), style: {
+                                : t('updates.status.idle', { version: status.version ?? "—", count: status.models.length }) }) })] }), status.service_active && status.models.length > 0 ? (SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsx("div", { style: { marginBottom: "8px" }, children: SP_JSX.jsxs(DFL.ButtonItem, { layout: "below", disabled: busy, onClick: handleOpenChat, description: t('chat.btn.open.desc'), children: [SP_JSX.jsx(FaRobot, { style: { marginRight: "8px", verticalAlign: "middle" } }), t('chat.btn.open')] }) }) })) : null, status.service_active ? (SP_JSX.jsxs(DFL.PanelSection, { title: t('lan.title'), children: [SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsx("div", { style: { color: "#8b8b8b", fontSize: "12px", marginBottom: "8px" }, children: t('lan.desc') }) }), lanInfoData ? (SP_JSX.jsxs(SP_JSX.Fragment, { children: [lanInfoData.warning && (SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsx("div", { style: { color: "#f43f5e", fontSize: "11px", padding: "8px", background: "#f43f5e11", borderRadius: "4px", border: "1px solid #f43f5e33", marginBottom: "8px" }, children: lanInfoData.warning }) })), SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsx("div", { style: { color: "#e6e6e6", fontSize: "12px", marginBottom: "8px" }, children: SP_JSX.jsx("strong", { children: t('lan.address', { url: lanInfoData.base_url ?? '' }) }) }) }), SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsx("div", { style: { color: "#8b8b8b", fontSize: "11px", marginBottom: "8px" }, children: t('lan.models', { models: lanInfoData.models?.join(", ") || 'none' }) }) }), SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsx("div", { style: { color: "#8b8b8b", fontSize: "11px", marginBottom: "8px" }, children: t('lan.examples') }) }), lanInfoData.examples && Object.entries(lanInfoData.examples).map(([lang, cmd]) => (SP_JSX.jsxs(SP_REACT.Fragment, { children: [SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsx("code", { style: { display: "block", width: "100%", boxSizing: "border-box", fontSize: "10px", background: "#1a1a1a", padding: "4px 8px", borderRadius: "4px", color: "#22c55e", whiteSpace: "pre-wrap", wordBreak: "break-all" }, children: cmd }) }), SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsx("div", { style: { marginBottom: "8px" }, children: SP_JSX.jsx(FocusBtn, { onClick: () => navigator.clipboard.writeText(cmd), disabled: busy, children: t('lan.btn.copy') }) }) })] }, lang)))] })) : (SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsx("div", { style: { color: "#8b8b8b", fontSize: "12px", marginBottom: "8px" }, children: t('lan.loading') }) }))] })) : null, status.models.length > 0 ? (SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsx("div", { style: { marginBottom: "8px" }, children: SP_JSX.jsxs(FocusBtn, { onClick: () => openModelsModal({ models: status.models }), children: [SP_JSX.jsx(FaTrash, { style: { marginRight: "6px", verticalAlign: "middle" } }), t('models.manage')] }) }) })) : (SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsx("div", { style: { color: "#8b8b8b", fontSize: "12px", marginBottom: "8px" }, children: t('models.empty') }) })), status.error ? (SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsx("div", { style: { color: "#f43f5e", fontSize: "12px", marginBottom: "8px" }, children: status.error }) })) : null, status.service_active && (SP_JSX.jsxs(DFL.PanelSection, { title: t('library.title'), children: [SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsx("div", { style: { color: "#8b8b8b", fontSize: "12px", marginBottom: "8px" }, children: t('library.desc') }) }), SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsx("input", { type: "text", value: librarySearch, onChange: (e) => setLibrarySearch(e.target.value), placeholder: t('library.search.placeholder'), style: {
                                 width: "100%",
                                 boxSizing: "border-box",
                                 padding: "8px",

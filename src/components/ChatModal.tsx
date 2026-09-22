@@ -109,42 +109,35 @@ function ChatModal({
   }, [input]);
 
 useEffect(() => {
-    // Multi-strategy focus to trigger SteamOS virtual keyboard
-    setTimeout(() => {
-      const el = inputRef.current;
-      if (!el) return;
-      
-      // Strategy 1: Ensure window has focus
-      window.focus();
-      
-      // Strategy 2: Focus the element
-      el.focus();
-      
-      // Strategy 3: Try Virtual Keyboard API (web standard)
-      const nav = navigator as any;
-      if (nav.virtualKeyboard && typeof nav.virtualKeyboard.show === 'function') {
-        nav.virtualKeyboard.show().catch(() => {});
+    // Wait until the popout window actually has focus, then focus textarea + trigger keyboard
+    let cancelled = false;
+    const maxWait = 5000; // ms
+    const interval = 100;
+    const start = Date.now();
+
+    const tryFocus = () => {
+      if (cancelled) return;
+      if (document.hasFocus()) {
+        const el = inputRef.current;
+        if (!el) return;
+        window.focus();
+        el.focus();
+        const nav = navigator as any;
+        if (nav.virtualKeyboard && typeof nav.virtualKeyboard.show === 'function') {
+          nav.virtualKeyboard.show().catch(() => {});
+        }
+        const win = window as any;
+        if (win.SteamClient?.showKeyboard) win.SteamClient.showKeyboard().catch(() => {});
+        if (win.Steam?.showKeyboard) win.Steam.showKeyboard().catch(() => {});
+        if (win.SteamUI?.showKeyboard) win.SteamUI.showKeyboard().catch(() => {});
+        el.click();
+        el.dispatchEvent(new FocusEvent('focus', { bubbles: true }));
+      } else if (Date.now() - start < maxWait) {
+        setTimeout(tryFocus, interval);
       }
-      
-      // Strategy 4: Try Steam client globals (SteamOS specific)
-      const win = window as any;
-      if (win.SteamClient?.showKeyboard) {
-        win.SteamClient.showKeyboard().catch(() => {});
-      }
-      if (win.Steam?.showKeyboard) {
-        win.Steam.showKeyboard().catch(() => {});
-      }
-      if (win.SteamUI?.showKeyboard) {
-        win.SteamUI.showKeyboard().catch(() => {});
-      }
-      
-      // Strategy 5: Click to trigger (some SteamOS versions)
-      el.click();
-      
-      // Strategy 6: Dispatch focus event
-      el.dispatchEvent(new FocusEvent('focus', { bubbles: true }));
-      
-    }, 500);
+    };
+    tryFocus();
+    return () => { cancelled = true; };
   }, []);
 
   const handleSend = async () => {

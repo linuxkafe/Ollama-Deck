@@ -61,6 +61,7 @@ const translations: Record<string, Translations> = {
     'lan.loading': 'Loading LAN info…',
 
     'models.title': 'Models',
+    'models.manage': 'Manage Models',
     'models.empty': 'No models — start service to list.',
 
     'library.title': 'Model Library',
@@ -204,6 +205,7 @@ const translations: Record<string, Translations> = {
     'lan.loading': 'A carregar informação LAN…',
 
     'models.title': 'Modelos',
+    'models.manage': 'Gerir Modelos',
     'models.empty': 'Nenhum modelo — liga o serviço para listar.',
 
     'library.title': 'Biblioteca de Modelos',

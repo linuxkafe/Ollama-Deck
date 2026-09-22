@@ -636,7 +636,7 @@ function Content() {
           <div style={{ marginBottom: "8px" }}>
             <FocusBtn onClick={() => openModelsModal({ models: status.models })}>
               <FaTrash style={{ marginRight: "6px", verticalAlign: "middle" }} />
-              {t('models.title')}
+              {t('models.manage')}
             </FocusBtn>
           </div>
         </PanelSectionRow>
