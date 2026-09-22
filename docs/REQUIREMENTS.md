@@ -22,6 +22,7 @@
 | FR-16 | Deteção automática de modelos de embedding instalados; se nenhum, oferece instalar recomendado (embeddinggemma). | `get_rag_config` devolve `installed_embedding_models` e `recommended_embedding_model`; botão instala via `pull_model`. |
 | FR-17 | CLI `ollama-deck rag-dir [path] [--json]` define/consulta diretório RAG. | `set_rag_config`/`get_rag_config` chamado. |
 | FR-18 | CLI `ollama-deck rag-model [model] [--json]` define/consulta modelo de embedding. | `set_rag_config`/`get_rag_config` chamado. |
+| FR-19 | "Abrir Chat" abre uma janela separada a ecrã completo (popout) com seleção de modelo a toda a largura e campo de escrita confortável. | Smoke no Deck: chat abre em janela popout sem deslocação à direita; `bForcePopOut`+`popupWidth/Height`. |
 
 ## Non-Functional Requirements
 

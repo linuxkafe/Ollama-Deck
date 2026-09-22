@@ -28,8 +28,11 @@ corpo 14px/400, muted 12px/400.
 | Linha de estado (dot verde/cinza) | serviço ativo + API reachable |
 | Lista de modelos | nome, tamanho, família (muted) |
 | URL da API | endereço visível para acesso remoto |
+| ChatModal (`src/components/ChatModal.tsx`) | chat em popout a ecrã completo via `openChatModal()` (padrão decky-lsfg-vk) |
 
 ## Padrões
 - Estados refletem sempre o backend (`get_status`), nunca estado local otimista.
 - Nenhum emoji no código fonte.
 - Feedback de erro do backend mostrado inline (sem toasters excessivos).
+- Inputs/selects/textarea usam `box-sizing: border-box` (e `min-width: 0` em filhos
+  flex) para evitar transbordo/deslocação à direita.

@@ -62,3 +62,29 @@ Registo de aprendizagens relevantes da análise hostil (fase de plan).
   `model_tags` de modo incorreto (pastas diferentes).
 - **Applied To**: `cli.default_settings_dir()` derivado do `name`.
 - **Date**: 2026-09-17
+
+## [Decky] — Modais popout precisam de `popupWidth/Height` explícitos + `ModalRoot bAllowFullSize`
+- **Task**: T013
+- **Insight**: `showModal(..., { bForcePopOut: true })` sem `popupWidth`/`popupHeight`
+  abre uma janela popout com tamanho default/instável (varia com o conteúdo), o que dá
+  a sensação de "janela dentro do menu Decky" com tamanhos a diferir. A solução é
+  dimensionar explicitamente para `window.screen` e envolver o conteúdo em
+  `<ModalRoot bAllowFullSize>` com `closeModal`/`onCancel` (padrão decky-lsfg-vk,
+  `BranchSetupModal.tsx`).
+- **Origin**: comparação entre o modal do T007 (sem tamanho, sem ModalRoot) e o do
+  plugin de referência decky-lsfg-vk (com `popupWidth/Height` + `ModalRoot bAllowFullSize`).
+- **Impact**: popout determinístico e a ecrã completo; fallback aceitável no QAM com `bAllowFullSize`.
+- **Applied To**: `openChatModal()` em `src/components/ChatModal.tsx`.
+- **Date**: 2026-09-22
+
+## [Decky] — Inputs com `width: 100%`/`flex: 1` + `padding` transbordam para a direita
+- **Task**: T013
+- **Insight**: os `<input>`/`<select>`/`<textarea>` nativos usam `content-box` e, em
+  flex, `min-width: auto` impede encolher abaixo da largura intrínseca; com
+  `width: 100%` + `padding` o conteúdo fica deslocado para a direita/orbiança. Correção
+  mínima: `box-sizing: border-box` (+ `min-width: 0` nos filhos flex). Sintoma reportado
+  como "seleção de modelo deslocado para o lado direito por não caber".
+- **Origin**: análise do JSX do painel e do chat (estados de estilo inline sem boxSizing).
+- **Impact**: eliminou a deslocação à direita no selector de modelo e nos inputs do painel.
+- **Applied To**: todos os inputs/selects/textarea do plugin (chat + painel).
+- **Date**: 2026-09-22

@@ -9,6 +9,7 @@
 
 ## Done (sprint-03)
 - [x] T006 Model Search & Install + RAG Directory with Embedding Model Resolution
+- [x] T013 Chat em janela separada a ecrã completo (popout dimensionado) + layout sem deslocação
 
 ## Backlog
 | Item | Impacto | Esforço | Prioridade | Estado |

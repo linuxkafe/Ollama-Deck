@@ -3,13 +3,13 @@ import {
   PanelSectionRow,
   ToggleField,
   ButtonItem,
-  staticClasses,
-  showModal
+  staticClasses
 } from "@decky/ui";
 import { callable, definePlugin, toaster } from "@decky/api";
-import { useEffect, useState, useRef } from "react";
+import { useEffect, useState } from "react";
 import { FaRobot, FaDownload, FaTrash } from "react-icons/fa";
 import { t } from "./i18n";
+import { openChatModal } from "./components/ChatModal";
 
 type ModelInfo = {
   name: string;
@@ -50,18 +50,6 @@ type UpdateResult = {
   ollama: OllamaUpdate;
   models: ModelUpdate[];
   error: string;
-};
-
-type ChatMessage = {
-  role: "user" | "assistant";
-  content: string;
-};
-
-type ChatResult = {
-  ok: boolean;
-  response?: string;
-  model?: string;
-  error?: string;
 };
 
 type LanInfoResult = {
@@ -126,7 +114,6 @@ const setKeepAwake = callable<[on: boolean], { ok: boolean }>("set_keep_awake");
 const updateAll = callable<[], UpdateResult>("update_all");
 const pullModel = callable<[tag: string], { ok: boolean; error?: string }>("pull_model");
 const deleteModel = callable<[tag: string], { ok: boolean; error?: string }>("delete_model");
-const chat = callable<[model: string, prompt: string, use_web_search?: boolean, persona?: Persona], ChatResult>("chat");
 const lanInfo = callable<[], LanInfoResult>("lan_info");
 const searchModels = callable<[query?: string, tags?: string[]], SearchModelsResult>("search_models");
 const getRagConfig = callable<[], RagConfigResult>("get_rag_config");
@@ -319,24 +306,14 @@ function Content() {
     }
   };
 
-  const openChatModal = () => {
+  const handleOpenChat = () => {
     if (!status?.service_active || status.models.length === 0) return;
-    showModal(
-      <ChatModal
-        models={status.models}
-        initialModel={chatModel || status.models[0].name}
-        initialPersona={persona}
-        initialWebSearch={webSearchEnabled}
-      />,
-      undefined,
-      {
-        strTitle: t('chat.modal.title'),
-        bForcePopOut: true,
-        bHideActionIcons: false,
-        bHideMainWindowForPopouts: false,
-        bNeverPopOut: false,
-      }
-    );
+    openChatModal({
+      models: status.models,
+      initialModel: chatModel || status.models[0].name,
+      initialPersona: persona,
+      initialWebSearch: webSearchEnabled,
+    });
   };
 
   useEffect(() => {
@@ -528,6 +505,7 @@ function Content() {
             placeholder={t('pull.modal.placeholder')}
             style={{
               width: "100%",
+              boxSizing: "border-box",
               padding: "8px",
               borderRadius: "4px",
               border: "1px solid #4a4a4a",
@@ -688,7 +666,7 @@ function Content() {
             <ButtonItem
               layout="below"
               disabled={busy}
-              onClick={openChatModal}
+              onClick={handleOpenChat}
               description={t('chat.btn.open.desc')}
             >
               <FaRobot style={{ marginRight: "8px", verticalAlign: "middle" }} />
@@ -827,6 +805,7 @@ function Content() {
               placeholder={t('library.search.placeholder')}
               style={{
                 width: "100%",
+                boxSizing: "border-box",
                 padding: "8px",
                 borderRadius: "4px",
                 border: "1px solid #4a4a4a",
@@ -938,6 +917,8 @@ function Content() {
               placeholder={t('rag.dir.placeholder')}
               style={{
                 flex: 1,
+                minWidth: 0,
+                boxSizing: "border-box",
                 padding: "8px",
                 borderRadius: "4px",
                 border: "1px solid #4a4a4a",
@@ -1042,6 +1023,7 @@ function Content() {
               placeholder={t('persona.name.placeholder')}
               style={{
                 width: "100%",
+                boxSizing: "border-box",
                 padding: "8px",
                 borderRadius: "4px",
                 border: "1px solid #4a4a4a",
@@ -1060,6 +1042,7 @@ function Content() {
               rows={4}
               style={{
                 width: "100%",
+                boxSizing: "border-box",
                 padding: "8px",
                 borderRadius: "4px",
                 border: "1px solid #4a4a4a",
@@ -1109,6 +1092,7 @@ function Content() {
               onChange={(e) => setPersonaModel(e.target.value)}
               style={{
                 width: "100%",
+                boxSizing: "border-box",
                 padding: "8px",
                 borderRadius: "4px",
                 border: "1px solid #4a4a4a",
@@ -1188,163 +1172,6 @@ function Content() {
       )}
 
     </PanelSection>
-  );
-}
-
-function ChatModal({
-  models,
-  initialModel,
-  initialPersona,
-  initialWebSearch
-}: {
-  models: ModelInfo[];
-  initialModel: string;
-  initialPersona: Persona;
-  initialWebSearch: boolean;
-}) {
-  const [chatMessages, setChatMessages] = useState<ChatMessage[]>([]);
-  const [chatInput, setChatInput] = useState("");
-  const [chatModel, setChatModel] = useState(initialModel);
-  const [chatBusy, setChatBusy] = useState(false);
-  const [webSearchEnabled, setWebSearchEnabled] = useState(initialWebSearch);
-  const [currentPersona] = useState<Persona>(initialPersona);
-  const messagesEndRef = useRef<HTMLDivElement>(null);
-
-  const scrollToBottom = () => {
-    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
-  };
-
-  useEffect(() => {
-    scrollToBottom();
-  }, [chatMessages]);
-
-  const handleSend = async () => {
-    if (!chatInput.trim() || !chatModel || chatBusy) return;
-    const prompt = chatInput.trim();
-    setChatInput("");
-    setChatBusy(true);
-    setChatMessages((prev) => [...prev, { role: "user", content: prompt }]);
-    try {
-      const res = await chat(chatModel, prompt, webSearchEnabled, currentPersona);
-      if (!res.ok) {
-        toaster.toast({
-          title: t('chat.error.failed'),
-          body: res.error || t('chat.error.unknown'),
-          critical: true,
-        });
-        setChatMessages((prev) => [...prev, { role: "assistant", content: `${t('chat.role.assistant')}: ${res.error}` }]);
-      } else {
-        setChatMessages((prev) => [...prev, { role: "assistant", content: res.response || "" }]);
-      }
-    } catch (err) {
-      toaster.toast({
-        title: t('chat.error.failed'),
-        body: String(err),
-        critical: true,
-      });
-      setChatMessages((prev) => [...prev, { role: "assistant", content: `${t('chat.role.assistant')}: ${err}` }]);
-    } finally {
-      setChatBusy(false);
-    }
-  };
-
-  return (
-    <div style={{ display: "flex", flexDirection: "column", height: "100%", minHeight: "500px" }}>
-      <div style={{ padding: "12px 16px", borderBottom: "1px solid #4a4a4a", background: "#1a1a1a" }}>
-        <div style={{ display: "flex", gap: "12px", alignItems: "center", flexWrap: "wrap" }}>
-          <select
-            value={chatModel}
-            onChange={(e) => setChatModel(e.target.value)}
-            disabled={chatBusy}
-            style={{
-              flex: 1,
-              minWidth: "200px",
-              padding: "10px",
-              borderRadius: "6px",
-              border: "1px solid #4a4a4a",
-              background: "#1a1a1a",
-              color: "#fafafa",
-              fontSize: "16px",
-            }}
-          >
-            {models.map((m) => (
-              <option key={m.name} value={m.name}>
-                {m.name}
-              </option>
-            ))}
-          </select>
-          <label style={{ display: "flex", alignItems: "center", gap: "8px", color: "#fafafa", fontSize: "14px", cursor: "pointer" }}>
-            <input
-              type="checkbox"
-              checked={webSearchEnabled}
-              onChange={(e) => setWebSearchEnabled(e.target.checked)}
-              disabled={chatBusy}
-              style={{ width: "18px", height: "18px", accentColor: "#22c55e" }}
-            />
-            {t('chat.web_search')}
-          </label>
-        </div>
-      </div>
-      <div
-        style={{
-          flex: 1,
-          overflowY: "auto",
-          padding: "16px",
-          background: "#0a0a0a",
-        }}
-      >
-        {chatMessages.map((msg, idx) => (
-          <div
-            key={idx}
-            style={{
-              marginBottom: "16px",
-              padding: "12px",
-              borderRadius: "8px",
-              background: msg.role === "user" ? "#22c55e22" : "#1a1a1a",
-              border: msg.role === "user" ? "1px solid #22c55e44" : "1px solid #4a4a4a",
-            }}
-          >
-            <div style={{ fontSize: "12px", color: "#8b8b8b", marginBottom: "8px", fontWeight: 500 }}>
-              {msg.role === "user" ? t('chat.role.user') : t('chat.role.assistant')}
-            </div>
-            <div style={{ color: "#fafafa", whiteSpace: "pre-wrap", wordBreak: "break-word", lineHeight: "1.5", fontSize: "15px" }}>
-              {msg.content}
-            </div>
-          </div>
-        ))}
-        {chatBusy && (
-          <div style={{ padding: "12px", color: "#22c55e", fontStyle: "italic" }}>
-            {t('chat.thinking')}
-          </div>
-        )}
-        <div ref={messagesEndRef} />
-      </div>
-      <div style={{ padding: "16px", borderTop: "1px solid #4a4a4a", background: "#1a1a1a" }}>
-        <div style={{ display: "flex", gap: "12px" }}>
-          <input
-            type="text"
-            value={chatInput}
-            onChange={(e) => setChatInput(e.target.value)}
-            onKeyDown={(e) => e.key === "Enter" && !chatBusy && handleSend()}
-            placeholder={t('chat.input.placeholder')}
-            disabled={chatBusy || !chatModel}
-            autoFocus
-            style={{
-              flex: 1,
-              padding: "14px",
-              borderRadius: "8px",
-              border: "1px solid #4a4a4a",
-              background: "#0a0a0a",
-              color: "#fafafa",
-              fontSize: "16px",
-            }}
-          />
-          <ButtonItem layout="inline" onClick={handleSend} disabled={chatBusy || !chatInput.trim() || !chatModel}>
-            {t('chat.btn.send')}
-          </ButtonItem>
-        </div>
-      </div>
-    </div>
   );
 }
 

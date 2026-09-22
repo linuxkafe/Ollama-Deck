@@ -357,6 +357,127 @@ function t(key, params) {
     return text;
 }
 
+const chat = callable("chat");
+function openChatModal(opts) {
+    const screenW = window.screen?.width && window.screen.width > 0 ? window.screen.width : 1280;
+    const screenH = window.screen?.height && window.screen.height > 0 ? window.screen.height : 800;
+    let closeModal = () => { };
+    const modal = DFL.showModal(SP_JSX.jsx(DFL.ModalRoot, { bAllowFullSize: true, closeModal: () => closeModal(), onCancel: () => closeModal(), onEscKeypress: () => closeModal(), children: SP_JSX.jsx(ChatModal, { models: opts.models, initialModel: opts.initialModel, initialPersona: opts.initialPersona, initialWebSearch: opts.initialWebSearch }) }), undefined, {
+        strTitle: t("chat.modal.title"),
+        bForcePopOut: true,
+        bHideActionIcons: false,
+        bHideMainWindowForPopouts: true,
+        bNeverPopOut: false,
+        popupWidth: screenW,
+        popupHeight: screenH,
+    });
+    closeModal = modal.Close;
+}
+function ChatModal({ models, initialModel, initialPersona, initialWebSearch, }) {
+    const [messages, setMessages] = SP_REACT.useState([]);
+    const [input, setInput] = SP_REACT.useState("");
+    const [model, setModel] = SP_REACT.useState(initialModel);
+    const [busy, setBusy] = SP_REACT.useState(false);
+    const [webSearch, setWebSearch] = SP_REACT.useState(initialWebSearch);
+    const [persona] = SP_REACT.useState(initialPersona);
+    const listEndRef = SP_REACT.useRef(null);
+    const inputRef = SP_REACT.useRef(null);
+    const scrollToBottom = () => {
+        listEndRef.current?.scrollIntoView({ behavior: "smooth" });
+    };
+    SP_REACT.useEffect(() => {
+        scrollToBottom();
+    }, [messages]);
+    const resizeInput = () => {
+        const el = inputRef.current;
+        if (!el)
+            return;
+        el.style.height = "auto";
+        el.style.height = `${Math.min(el.scrollHeight, 140)}px`;
+    };
+    SP_REACT.useEffect(() => {
+        resizeInput();
+    }, [input]);
+    const handleSend = async () => {
+        if (!input.trim() || !model || busy)
+            return;
+        const prompt = input.trim();
+        setInput("");
+        setBusy(true);
+        setMessages((prev) => [...prev, { role: "user", content: prompt }]);
+        try {
+            const res = await chat(model, prompt, webSearch, persona);
+            if (!res.ok) {
+                toaster.toast({
+                    title: t("chat.error.failed"),
+                    body: res.error || t("chat.error.unknown"),
+                    critical: true,
+                });
+                setMessages((prev) => [...prev, { role: "assistant", content: `${t("chat.role.assistant")}: ${res.error || t("chat.error.unknown")}` }]);
+            }
+            else {
+                setMessages((prev) => [...prev, { role: "assistant", content: res.response || "" }]);
+            }
+        }
+        catch (err) {
+            toaster.toast({
+                title: t("chat.error.failed"),
+                body: String(err),
+                critical: true,
+            });
+            setMessages((prev) => [...prev, { role: "assistant", content: `${t("chat.role.assistant")}: ${err}` }]);
+        }
+        finally {
+            setBusy(false);
+        }
+    };
+    return (SP_JSX.jsxs("div", { style: {
+            display: "flex",
+            flexDirection: "column",
+            height: "100%",
+            minHeight: "70vh",
+            width: "100%",
+            boxSizing: "border-box",
+            overflow: "hidden",
+            background: "#0a0a0a",
+        }, children: [SP_JSX.jsx("div", { style: { padding: "12px 16px", borderBottom: "1px solid #4a4a4a", background: "#1a1a1a" }, children: SP_JSX.jsxs("div", { style: { display: "flex", flexDirection: "column", gap: "10px" }, children: [SP_JSX.jsx("select", { value: model, onChange: (e) => setModel(e.target.value), disabled: busy, style: {
+                                width: "100%",
+                                boxSizing: "border-box",
+                                padding: "10px 12px",
+                                borderRadius: "6px",
+                                border: "1px solid #4a4a4a",
+                                background: "#0a0a0a",
+                                color: "#fafafa",
+                                fontSize: "16px",
+                            }, children: models.map((m) => (SP_JSX.jsx("option", { value: m.name, children: m.name }, m.name))) }), SP_JSX.jsxs("label", { style: { display: "flex", alignItems: "center", gap: "8px", color: "#fafafa", fontSize: "14px", cursor: "pointer", userSelect: "none" }, children: [SP_JSX.jsx("input", { type: "checkbox", checked: webSearch, onChange: (e) => setWebSearch(e.target.checked), disabled: busy, style: { width: "18px", height: "18px", accentColor: "#22c55e" } }), t("chat.web_search")] })] }) }), SP_JSX.jsxs("div", { style: { flex: 1, minHeight: 0, overflowY: "auto", padding: "16px" }, children: [messages.length === 0 && (SP_JSX.jsx("div", { style: { color: "#8b8b8b", textAlign: "center", padding: "40px 16px" }, children: t("chat.input.placeholder") })), messages.map((msg, idx) => (SP_JSX.jsxs("div", { style: {
+                            marginBottom: "16px",
+                            padding: "12px",
+                            borderRadius: "8px",
+                            background: msg.role === "user" ? "#22c55e22" : "#1a1a1a",
+                            border: msg.role === "user" ? "1px solid #22c55e44" : "1px solid #4a4a4a",
+                        }, children: [SP_JSX.jsx("div", { style: { fontSize: "12px", color: "#8b8b8b", marginBottom: "8px", fontWeight: 500 }, children: msg.role === "user" ? t("chat.role.user") : t("chat.role.assistant") }), SP_JSX.jsx("div", { style: { color: "#fafafa", whiteSpace: "pre-wrap", wordBreak: "break-word", lineHeight: "1.5", fontSize: "15px" }, children: msg.content })] }, idx))), busy && (SP_JSX.jsx("div", { style: { padding: "12px", color: "#22c55e", fontStyle: "italic" }, children: t("chat.thinking") })), SP_JSX.jsx("div", { ref: listEndRef })] }), SP_JSX.jsx("div", { style: { padding: "16px", borderTop: "1px solid #4a4a4a", background: "#1a1a1a" }, children: SP_JSX.jsxs("div", { style: { display: "flex", gap: "12px", alignItems: "flex-end" }, children: [SP_JSX.jsx("textarea", { ref: inputRef, value: input, onChange: (e) => setInput(e.target.value), onKeyDown: (e) => {
+                                if (e.key === "Enter" && !e.shiftKey) {
+                                    e.preventDefault();
+                                    if (!busy)
+                                        handleSend();
+                                }
+                            }, placeholder: t("chat.input.placeholder"), disabled: busy || !model, autoFocus: true, rows: 1, style: {
+                                flex: 1,
+                                minWidth: 0,
+                                boxSizing: "border-box",
+                                resize: "none",
+                                overflow: "hidden",
+                                padding: "12px 14px",
+                                borderRadius: "8px",
+                                border: "1px solid #4a4a4a",
+                                background: "#0a0a0a",
+                                color: "#fafafa",
+                                fontSize: "16px",
+                                lineHeight: "1.4",
+                                maxHeight: "140px",
+                            } }), SP_JSX.jsx(DFL.ButtonItem, { layout: "inline", onClick: () => handleSend(), disabled: busy || !input.trim() || !model, children: t("chat.btn.send") })] }) })] }));
+}
+
 const getStatus = callable("get_status");
 const setService = callable("set_service");
 const setAutostart = callable("set_autostart");
@@ -364,7 +485,6 @@ const setKeepAwake = callable("set_keep_awake");
 const updateAll = callable("update_all");
 const pullModel = callable("pull_model");
 const deleteModel = callable("delete_model");
-const chat = callable("chat");
 const lanInfo = callable("lan_info");
 const searchModels = callable("search_models");
 const getRagConfig = callable("get_rag_config");
@@ -553,15 +673,14 @@ function Content() {
             console.error("lan_info failed", err);
         }
     };
-    const openChatModal = () => {
+    const handleOpenChat = () => {
         if (!status?.service_active || status.models.length === 0)
             return;
-        DFL.showModal(SP_JSX.jsx(ChatModal, { models: status.models, initialModel: chatModel || status.models[0].name, initialPersona: persona, initialWebSearch: webSearchEnabled }), undefined, {
-            strTitle: t('chat.modal.title'),
-            bForcePopOut: true,
-            bHideActionIcons: false,
-            bHideMainWindowForPopouts: false,
-            bNeverPopOut: false,
+        openChatModal({
+            models: status.models,
+            initialModel: chatModel || status.models[0].name,
+            initialPersona: persona,
+            initialWebSearch: webSearchEnabled,
         });
     };
     SP_REACT.useEffect(() => {
@@ -741,6 +860,7 @@ function Content() {
     if (pullModalOpen) {
         return (SP_JSX.jsxs(DFL.PanelSection, { title: t('pull.modal.title'), children: [SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsx("div", { style: { color: "#8b8b8b", fontSize: "12px", marginBottom: "8px" }, children: t('pull.modal.hint') }) }), SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsx("input", { type: "text", value: pullModelName, onChange: (e) => setPullModelName(e.target.value), placeholder: t('pull.modal.placeholder'), style: {
                             width: "100%",
+                            boxSizing: "border-box",
                             padding: "8px",
                             borderRadius: "4px",
                             border: "1px solid #4a4a4a",
@@ -765,13 +885,14 @@ function Content() {
                                 ? t('updates.btn.update.desc.active')
                                 : t('updates.btn.update.desc.inactive'), children: [SP_JSX.jsx(FaDownload, { style: { marginRight: "8px", verticalAlign: "middle" } }), t('updates.btn.update')] }) }), SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsxs(DFL.ButtonItem, { layout: "below", disabled: busy || !status.service_active, onClick: () => setPullModalOpen(true), description: t('updates.btn.install.desc'), children: [SP_JSX.jsx(FaDownload, { style: { marginRight: "8px", verticalAlign: "middle" } }), t('updates.btn.install')] }) }), SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsx("div", { style: { color: "#8b8b8b", fontSize: "12px" }, children: busy
                                 ? t('updates.status.updating')
-                                : t('updates.status.idle', { version: status.version ?? "—", count: status.models.length }) }) })] }), status.service_active && status.models.length > 0 ? (SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsx("div", { style: { marginBottom: "8px" }, children: SP_JSX.jsxs(DFL.ButtonItem, { layout: "below", disabled: busy, onClick: openChatModal, description: t('chat.btn.open.desc'), children: [SP_JSX.jsx(FaRobot, { style: { marginRight: "8px", verticalAlign: "middle" } }), t('chat.btn.open')] }) }) })) : null, status.service_active ? (SP_JSX.jsxs(DFL.PanelSection, { title: t('lan.title'), children: [SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsx("div", { style: { color: "#8b8b8b", fontSize: "12px", marginBottom: "8px" }, children: t('lan.desc') }) }), lanInfoData ? (SP_JSX.jsxs(SP_JSX.Fragment, { children: [lanInfoData.warning && (SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsx("div", { style: { color: "#f43f5e", fontSize: "11px", padding: "8px", background: "#f43f5e11", borderRadius: "4px", border: "1px solid #f43f5e33", marginBottom: "8px" }, children: lanInfoData.warning }) })), SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsx("div", { style: { color: "#e6e6e6", fontSize: "12px", marginBottom: "8px" }, children: SP_JSX.jsx("strong", { children: t('lan.address', { url: lanInfoData.base_url ?? '' }) }) }) }), SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsx("div", { style: { color: "#8b8b8b", fontSize: "11px", marginBottom: "8px" }, children: t('lan.models', { models: lanInfoData.models?.join(", ") || 'none' }) }) }), SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsx("div", { style: { color: "#8b8b8b", fontSize: "11px", marginBottom: "8px" }, children: t('lan.examples') }) }), lanInfoData.examples && Object.entries(lanInfoData.examples).map(([lang, cmd]) => (SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsxs("div", { style: { display: "flex", gap: "8px", alignItems: "center", marginBottom: "8px" }, children: [SP_JSX.jsx("code", { style: { flex: 1, fontSize: "10px", background: "#1a1a1a", padding: "4px 8px", borderRadius: "4px", color: "#22c55e", whiteSpace: "pre-wrap", wordBreak: "break-all" }, children: cmd }), SP_JSX.jsx(DFL.ButtonItem, { layout: "inline", onClick: () => navigator.clipboard.writeText(cmd), disabled: busy, children: t('lan.btn.copy') })] }) }, lang)))] })) : (SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsx("div", { style: { color: "#8b8b8b", fontSize: "12px", marginBottom: "8px" }, children: t('lan.loading') }) }))] })) : null, status.models.length > 0 ? (SP_JSX.jsx(DFL.PanelSection, { title: t('models.title'), children: status.models.map((m) => (SP_JSX.jsxs(DFL.PanelSectionRow, { children: [SP_JSX.jsxs("div", { style: {
+                                : t('updates.status.idle', { version: status.version ?? "—", count: status.models.length }) }) })] }), status.service_active && status.models.length > 0 ? (SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsx("div", { style: { marginBottom: "8px" }, children: SP_JSX.jsxs(DFL.ButtonItem, { layout: "below", disabled: busy, onClick: handleOpenChat, description: t('chat.btn.open.desc'), children: [SP_JSX.jsx(FaRobot, { style: { marginRight: "8px", verticalAlign: "middle" } }), t('chat.btn.open')] }) }) })) : null, status.service_active ? (SP_JSX.jsxs(DFL.PanelSection, { title: t('lan.title'), children: [SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsx("div", { style: { color: "#8b8b8b", fontSize: "12px", marginBottom: "8px" }, children: t('lan.desc') }) }), lanInfoData ? (SP_JSX.jsxs(SP_JSX.Fragment, { children: [lanInfoData.warning && (SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsx("div", { style: { color: "#f43f5e", fontSize: "11px", padding: "8px", background: "#f43f5e11", borderRadius: "4px", border: "1px solid #f43f5e33", marginBottom: "8px" }, children: lanInfoData.warning }) })), SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsx("div", { style: { color: "#e6e6e6", fontSize: "12px", marginBottom: "8px" }, children: SP_JSX.jsx("strong", { children: t('lan.address', { url: lanInfoData.base_url ?? '' }) }) }) }), SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsx("div", { style: { color: "#8b8b8b", fontSize: "11px", marginBottom: "8px" }, children: t('lan.models', { models: lanInfoData.models?.join(", ") || 'none' }) }) }), SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsx("div", { style: { color: "#8b8b8b", fontSize: "11px", marginBottom: "8px" }, children: t('lan.examples') }) }), lanInfoData.examples && Object.entries(lanInfoData.examples).map(([lang, cmd]) => (SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsxs("div", { style: { display: "flex", gap: "8px", alignItems: "center", marginBottom: "8px" }, children: [SP_JSX.jsx("code", { style: { flex: 1, fontSize: "10px", background: "#1a1a1a", padding: "4px 8px", borderRadius: "4px", color: "#22c55e", whiteSpace: "pre-wrap", wordBreak: "break-all" }, children: cmd }), SP_JSX.jsx(DFL.ButtonItem, { layout: "inline", onClick: () => navigator.clipboard.writeText(cmd), disabled: busy, children: t('lan.btn.copy') })] }) }, lang)))] })) : (SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsx("div", { style: { color: "#8b8b8b", fontSize: "12px", marginBottom: "8px" }, children: t('lan.loading') }) }))] })) : null, status.models.length > 0 ? (SP_JSX.jsx(DFL.PanelSection, { title: t('models.title'), children: status.models.map((m) => (SP_JSX.jsxs(DFL.PanelSectionRow, { children: [SP_JSX.jsxs("div", { style: {
                                 display: "flex",
                                 justifyContent: "space-between",
                                 alignItems: "center",
                                 color: "#e6e6e6"
                             }, children: [SP_JSX.jsx("span", { children: m.name }), SP_JSX.jsxs("div", { style: { display: "flex", alignItems: "center", gap: "8px" }, children: [SP_JSX.jsxs("span", { style: { color: "#8b8b8b" }, children: [m.family, " \u00B7 ", formatSize(m.size)] }), SP_JSX.jsx(DFL.ButtonItem, { layout: "inline", disabled: busy || deleteConfirm === m.name, onClick: () => setDeleteConfirm(m.name), description: t('delete.desc'), children: SP_JSX.jsx(FaTrash, { style: { marginRight: "4px", verticalAlign: "middle" } }) })] })] }), deleteConfirm === m.name && (SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsxs("div", { style: { display: "flex", gap: "8px", justifyContent: "flex-end" }, children: [SP_JSX.jsx(DFL.ButtonItem, { layout: "inline", onClick: () => setDeleteConfirm(null), children: t('delete.btn.cancel') }), SP_JSX.jsx(DFL.ButtonItem, { layout: "inline", onClick: () => doDelete(m.name), children: t('delete.btn.confirm') })] }) }))] }, m.name))) })) : (SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsx("div", { style: { color: "#8b8b8b", fontSize: "12px", marginBottom: "8px" }, children: t('models.empty') }) })), status.error ? (SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsx("div", { style: { color: "#f43f5e", fontSize: "12px", marginBottom: "8px" }, children: status.error }) })) : null, status.service_active && (SP_JSX.jsxs(DFL.PanelSection, { title: t('library.title'), children: [SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsx("div", { style: { color: "#8b8b8b", fontSize: "12px", marginBottom: "8px" }, children: t('library.desc') }) }), SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsx("input", { type: "text", value: librarySearch, onChange: (e) => setLibrarySearch(e.target.value), placeholder: t('library.search.placeholder'), style: {
                                 width: "100%",
+                                boxSizing: "border-box",
                                 padding: "8px",
                                 borderRadius: "4px",
                                 border: "1px solid #4a4a4a",
@@ -803,6 +924,8 @@ function Content() {
                                     }, children: t(tagKey) }, tag));
                             }) }) }), libraryLoading ? (SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsx("div", { style: { color: "#8b8b8b", fontSize: "12px", textAlign: "center", padding: "16px" }, children: t('library.loading') }) })) : (SP_JSX.jsx(SP_JSX.Fragment, { children: libraryResults.length > 0 ? (libraryResults.map((m) => (SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsxs("div", { style: { display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "8px" }, children: [SP_JSX.jsxs("div", { children: [SP_JSX.jsx("div", { style: { color: "#e6e6e6", fontWeight: 500 }, children: m.name }), SP_JSX.jsx("div", { style: { color: "#8b8b8b", fontSize: "11px" }, children: m.description }), SP_JSX.jsx("div", { style: { display: "flex", gap: "4px", marginTop: "4px" }, children: m.tags.map((t) => (SP_JSX.jsx("span", { style: { fontSize: "10px", padding: "2px 6px", background: "#22c55e22", borderRadius: "3px", color: "#22c55e" }, children: t }, t))) })] }), SP_JSX.jsx(DFL.ButtonItem, { layout: "inline", onClick: () => doLibraryInstall(m.name), disabled: busy, description: t('library.btn.install.desc', { name: m.name }), children: t('library.btn.install') })] }) }, m.name)))) : (SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsx("div", { style: { color: "#8b8b8b", fontSize: "12px", textAlign: "center", padding: "16px" }, children: t('library.empty') }) })) })), SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsx("div", { style: { color: "#8b8b8b", fontSize: "11px", marginTop: "8px" }, children: t('library.hint') }) })] })), status.service_active && (SP_JSX.jsxs(DFL.PanelSection, { title: t('rag.title'), children: [SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsx("div", { style: { color: "#8b8b8b", fontSize: "12px", marginBottom: "8px" }, children: t('rag.desc') }) }), SP_JSX.jsxs(DFL.PanelSectionRow, { children: [SP_JSX.jsx("input", { type: "text", value: ragDirInput, onChange: (e) => setRagDirInput(e.target.value), placeholder: t('rag.dir.placeholder'), style: {
                                     flex: 1,
+                                    minWidth: 0,
+                                    boxSizing: "border-box",
                                     padding: "8px",
                                     borderRadius: "4px",
                                     border: "1px solid #4a4a4a",
@@ -811,6 +934,7 @@ function Content() {
                                     fontSize: "14px",
                                 } }), SP_JSX.jsx(DFL.ButtonItem, { layout: "inline", onClick: doRagDirSave, disabled: busy, children: t('rag.btn.save') })] }), ragConfig && (SP_JSX.jsxs(SP_JSX.Fragment, { children: [SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsx("div", { style: { color: "#8b8b8b", fontSize: "11px", marginBottom: "8px" }, children: t('rag.current', { dir: ragConfig.rag_documents_dir || 'not defined' }) }) }), SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsx("div", { style: { color: "#8b8b8b", fontSize: "12px", marginBottom: "8px", marginTop: "8px" }, children: t('rag.embedding.title') }) }), ragConfig.installed_embedding_models.length > 0 ? (SP_JSX.jsxs(SP_JSX.Fragment, { children: [SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsx("div", { style: { color: "#e6e6e6", fontSize: "12px", marginBottom: "4px" }, children: t('rag.embedding.installed', { models: ragConfig.installed_embedding_models.join(", ") }) }) }), ragConfig.rag_embedding_model ? (SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsxs("div", { style: { display: "flex", gap: "8px", alignItems: "center", marginBottom: "8px" }, children: [SP_JSX.jsx("span", { style: { color: "#e6e6e6" }, children: t('rag.embedding.active', { model: ragConfig.rag_embedding_model }) }), ragConfig.installed_embedding_models.filter((m) => m !== ragConfig.rag_embedding_model).map((m) => (SP_JSX.jsx(DFL.ButtonItem, { layout: "inline", onClick: () => doRagModelSet(m), disabled: busy, children: t('rag.embedding.btn.use', { model: m }) }, m)))] }) })) : (SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsx("div", { style: { display: "flex", gap: "8px", marginBottom: "8px" }, children: ragConfig.installed_embedding_models.map((m) => (SP_JSX.jsx(DFL.ButtonItem, { layout: "inline", onClick: () => doRagModelSet(m), disabled: busy, children: t('rag.embedding.btn.use', { model: m }) }, m))) }) }))] })) : (SP_JSX.jsxs(SP_JSX.Fragment, { children: [SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsx("div", { style: { color: "#f43f5e", fontSize: "11px", padding: "8px", background: "#f43f5e11", borderRadius: "4px", border: "1px solid #f43f5e33", marginBottom: "8px" }, children: t('rag.embedding.none') }) }), ragConfig.recommended_embedding_model && (SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsx(DFL.ButtonItem, { layout: "inline", onClick: doRagModelInstall, disabled: busy || ragModelInstalling, children: ragModelInstalling ? t('rag.embedding.installing') : t('rag.embedding.btn.install', { model: ragConfig.recommended_embedding_model }) }) }))] }))] }))] })), status.service_active && (SP_JSX.jsxs(DFL.PanelSection, { title: t('persona.title'), children: [SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsx("div", { style: { color: "#8b8b8b", fontSize: "12px", marginBottom: "8px" }, children: t('persona.desc') }) }), SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsx("input", { type: "text", value: personaName || persona.name, onChange: (e) => setPersonaName(e.target.value), placeholder: t('persona.name.placeholder'), style: {
                                 width: "100%",
+                                boxSizing: "border-box",
                                 padding: "8px",
                                 borderRadius: "4px",
                                 border: "1px solid #4a4a4a",
@@ -820,6 +944,7 @@ function Content() {
                                 marginBottom: "8px",
                             } }) }), SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsx("textarea", { value: personaSystemPrompt || persona.system_prompt, onChange: (e) => setPersonaSystemPrompt(e.target.value), placeholder: t('persona.system_prompt.placeholder'), rows: 4, style: {
                                 width: "100%",
+                                boxSizing: "border-box",
                                 padding: "8px",
                                 borderRadius: "4px",
                                 border: "1px solid #4a4a4a",
@@ -830,6 +955,7 @@ function Content() {
                                 resize: "vertical",
                             } }) }), SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsxs("div", { style: { display: "flex", gap: "12px", flexWrap: "wrap", marginBottom: "8px" }, children: [SP_JSX.jsxs("div", { style: { flex: 1, minWidth: "150px" }, children: [SP_JSX.jsxs("label", { style: { display: "block", color: "#8b8b8b", fontSize: "12px", marginBottom: "4px" }, children: [t('persona.temperature'), " (", personaTemperature.toFixed(1), ")"] }), SP_JSX.jsx("input", { type: "range", min: "0", max: "2", step: "0.1", value: personaTemperature, onChange: (e) => setPersonaTemperature(parseFloat(e.target.value)), style: { width: "100%", accentColor: "#22c55e" } })] }), SP_JSX.jsxs("div", { style: { flex: 1, minWidth: "150px" }, children: [SP_JSX.jsxs("label", { style: { display: "block", color: "#8b8b8b", fontSize: "12px", marginBottom: "4px" }, children: [t('persona.max_tokens'), " (", personaMaxTokens, ")"] }), SP_JSX.jsx("input", { type: "range", min: "1", max: "8192", step: "1", value: personaMaxTokens, onChange: (e) => setPersonaMaxTokens(parseInt(e.target.value)), style: { width: "100%", accentColor: "#22c55e" } })] })] }) }), SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsxs("select", { value: personaModel || persona.model, onChange: (e) => setPersonaModel(e.target.value), style: {
                                 width: "100%",
+                                boxSizing: "border-box",
                                 padding: "8px",
                                 borderRadius: "4px",
                                 border: "1px solid #4a4a4a",
@@ -860,83 +986,6 @@ function Content() {
                                             toaster.toast({ title: t('toast.persona.save_failed'), body: res.error || "", critical: true });
                                         }
                                     }, disabled: busy, children: t('persona.btn.save') })] }) })] })), status.service_active && (SP_JSX.jsxs(DFL.PanelSection, { title: t('plugins.title'), children: [SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsx("div", { style: { color: "#8b8b8b", fontSize: "12px", marginBottom: "8px" }, children: t('plugins.desc') }) }), SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsx("div", { style: { color: "#8b8b8b", fontSize: "12px", marginBottom: "8px" }, children: t('plugins.coming_soon') }) }), SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsx("div", { style: { color: "#8b8b8b", fontSize: "11px" }, children: t('plugins.persona_marketplace') }) })] }))] }));
-}
-function ChatModal({ models, initialModel, initialPersona, initialWebSearch }) {
-    const [chatMessages, setChatMessages] = SP_REACT.useState([]);
-    const [chatInput, setChatInput] = SP_REACT.useState("");
-    const [chatModel, setChatModel] = SP_REACT.useState(initialModel);
-    const [chatBusy, setChatBusy] = SP_REACT.useState(false);
-    const [webSearchEnabled, setWebSearchEnabled] = SP_REACT.useState(initialWebSearch);
-    const [currentPersona] = SP_REACT.useState(initialPersona);
-    const messagesEndRef = SP_REACT.useRef(null);
-    const scrollToBottom = () => {
-        messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
-    };
-    SP_REACT.useEffect(() => {
-        scrollToBottom();
-    }, [chatMessages]);
-    const handleSend = async () => {
-        if (!chatInput.trim() || !chatModel || chatBusy)
-            return;
-        const prompt = chatInput.trim();
-        setChatInput("");
-        setChatBusy(true);
-        setChatMessages((prev) => [...prev, { role: "user", content: prompt }]);
-        try {
-            const res = await chat(chatModel, prompt, webSearchEnabled, currentPersona);
-            if (!res.ok) {
-                toaster.toast({
-                    title: t('chat.error.failed'),
-                    body: res.error || t('chat.error.unknown'),
-                    critical: true,
-                });
-                setChatMessages((prev) => [...prev, { role: "assistant", content: `${t('chat.role.assistant')}: ${res.error}` }]);
-            }
-            else {
-                setChatMessages((prev) => [...prev, { role: "assistant", content: res.response || "" }]);
-            }
-        }
-        catch (err) {
-            toaster.toast({
-                title: t('chat.error.failed'),
-                body: String(err),
-                critical: true,
-            });
-            setChatMessages((prev) => [...prev, { role: "assistant", content: `${t('chat.role.assistant')}: ${err}` }]);
-        }
-        finally {
-            setChatBusy(false);
-        }
-    };
-    return (SP_JSX.jsxs("div", { style: { display: "flex", flexDirection: "column", height: "100%", minHeight: "500px" }, children: [SP_JSX.jsx("div", { style: { padding: "12px 16px", borderBottom: "1px solid #4a4a4a", background: "#1a1a1a" }, children: SP_JSX.jsxs("div", { style: { display: "flex", gap: "12px", alignItems: "center", flexWrap: "wrap" }, children: [SP_JSX.jsx("select", { value: chatModel, onChange: (e) => setChatModel(e.target.value), disabled: chatBusy, style: {
-                                flex: 1,
-                                minWidth: "200px",
-                                padding: "10px",
-                                borderRadius: "6px",
-                                border: "1px solid #4a4a4a",
-                                background: "#1a1a1a",
-                                color: "#fafafa",
-                                fontSize: "16px",
-                            }, children: models.map((m) => (SP_JSX.jsx("option", { value: m.name, children: m.name }, m.name))) }), SP_JSX.jsxs("label", { style: { display: "flex", alignItems: "center", gap: "8px", color: "#fafafa", fontSize: "14px", cursor: "pointer" }, children: [SP_JSX.jsx("input", { type: "checkbox", checked: webSearchEnabled, onChange: (e) => setWebSearchEnabled(e.target.checked), disabled: chatBusy, style: { width: "18px", height: "18px", accentColor: "#22c55e" } }), t('chat.web_search')] })] }) }), SP_JSX.jsxs("div", { style: {
-                    flex: 1,
-                    overflowY: "auto",
-                    padding: "16px",
-                    background: "#0a0a0a",
-                }, children: [chatMessages.map((msg, idx) => (SP_JSX.jsxs("div", { style: {
-                            marginBottom: "16px",
-                            padding: "12px",
-                            borderRadius: "8px",
-                            background: msg.role === "user" ? "#22c55e22" : "#1a1a1a",
-                            border: msg.role === "user" ? "1px solid #22c55e44" : "1px solid #4a4a4a",
-                        }, children: [SP_JSX.jsx("div", { style: { fontSize: "12px", color: "#8b8b8b", marginBottom: "8px", fontWeight: 500 }, children: msg.role === "user" ? t('chat.role.user') : t('chat.role.assistant') }), SP_JSX.jsx("div", { style: { color: "#fafafa", whiteSpace: "pre-wrap", wordBreak: "break-word", lineHeight: "1.5", fontSize: "15px" }, children: msg.content })] }, idx))), chatBusy && (SP_JSX.jsx("div", { style: { padding: "12px", color: "#22c55e", fontStyle: "italic" }, children: t('chat.thinking') })), SP_JSX.jsx("div", { ref: messagesEndRef })] }), SP_JSX.jsx("div", { style: { padding: "16px", borderTop: "1px solid #4a4a4a", background: "#1a1a1a" }, children: SP_JSX.jsxs("div", { style: { display: "flex", gap: "12px" }, children: [SP_JSX.jsx("input", { type: "text", value: chatInput, onChange: (e) => setChatInput(e.target.value), onKeyDown: (e) => e.key === "Enter" && !chatBusy && handleSend(), placeholder: t('chat.input.placeholder'), disabled: chatBusy || !chatModel, autoFocus: true, style: {
-                                flex: 1,
-                                padding: "14px",
-                                borderRadius: "8px",
-                                border: "1px solid #4a4a4a",
-                                background: "#0a0a0a",
-                                color: "#fafafa",
-                                fontSize: "16px",
-                            } }), SP_JSX.jsx(DFL.ButtonItem, { layout: "inline", onClick: handleSend, disabled: chatBusy || !chatInput.trim() || !chatModel, children: t('chat.btn.send') })] }) })] }));
 }
 var index = definePlugin(() => ({
     name: t('app.title'),
