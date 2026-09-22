@@ -1,7 +1,8 @@
 import { useEffect, useRef, useState } from "react";
-import { ButtonItem, ModalRoot, showModal } from "@decky/ui";
+import { ModalRoot, showModal } from "@decky/ui";
 import { callable, toaster } from "@decky/api";
 import { t } from "../i18n";
+import { Btn } from "./ui";
 
 type ModelInfo = {
   name: string;
@@ -249,11 +250,9 @@ function ChatModal({
               maxHeight: "140px",
             }}
           />
-          <div style={{ display: "flex", justifyContent: "flex-end" }}>
-            <ButtonItem layout="inline" onClick={() => handleSend()} disabled={busy || !input.trim() || !model}>
-              {t("chat.btn.send")}
-            </ButtonItem>
-          </div>
+          <Btn onClick={() => handleSend()} disabled={busy || !input.trim() || !model}>
+            {t("chat.btn.send")}
+          </Btn>
         </div>
       </div>
     </div>
