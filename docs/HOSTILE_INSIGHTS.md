@@ -131,3 +131,28 @@ Registo de aprendizagens relevantes da análise hostil (fase de plan).
 - **Applied To**: `src/components/ui.tsx` (helper `Btn`); chat send, LAN copy, RAG save,
   library install, embedding use/install, models delete/confirm, pull modal, persona footer.
 - **Date**: 2026-09-22
+## [UI] — Action icons do modal Decky são "botões à direita" no chat
+- **Task**: T018
+- **Insight**: último report ("Começa o problema a partir do chat"): o chat é a única janela
+  `showModal` do plugin — e o Decky modal renderiza **action icons no header (topo-direita)**
+  quando `bHideActionIcons: false` (default). Ou seja, havia botões à direita no chat mesmo
+  com o conteúdo 100% empilhado (T013/T015/T017). Fix: `bHideActionIcons: true` no `showModal`
+  do popout do chat; fecho continua por `Esc`/`onCancel`/SteamOS B.
+- **Origin**: auditoria de TODAS as janelas (painel + 1 modal) após 4ª iteração do report.
+- **Impact**: chat sem qualquer botão na margem direita; independe de i18n — verificação
+  PT/EN confirma (labels curtas, `Btn` compacto `nowrap`, idêntico nas duas línguas).
+- **Applied To**: `src/components/ChatModal.tsx` (`openChatModal` options).
+- **Date**: 2026-09-22
+
+## [Process] — Report "contínua" ≠ regressão: auditar por construção, não por mancha
+- **Task**: T018
+- **Insight**: o utilizador repete o mesmo symptoma 4 iterações seguidas. Em vez de re-empilhar
+  o que já está empilhado (T015/T016/T017 foram mais do mesmo), a causa estava OMISSA: o modal
+  Decky (única janela extra) tem action icons próprios no header direito. Lição: quando um
+  report persiste, procurar camadas de UI fora do `src` que possua — o framework/loader
+  (SteamOS/Decky) também desenha botões.
+- **Origin**: análise de hosts de botões (plugin vs framework) no 4º ciclo.
+- **Impact**: método de diagnóstico para ciclos repetidos; checar chrome do framework antes de
+  duplicar correções no src.
+- **Applied To**: processo AES (Diagnóstico: primeiro os donos dos pixels).
+- **Date**: 2026-09-22

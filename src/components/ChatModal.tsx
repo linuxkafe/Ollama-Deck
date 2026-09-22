@@ -60,7 +60,7 @@ export function openChatModal(opts: {
     {
       strTitle: t("chat.modal.title"),
       bForcePopOut: true,
-      bHideActionIcons: false,
+      bHideActionIcons: true,
       bHideMainWindowForPopouts: true,
       bNeverPopOut: false,
       popupWidth: screenW,

@@ -14,6 +14,7 @@
 - [x] T015 Regra: sem botões à direita de campos (UI empilhado, campos 100%)
 - [x] T016 Publicação T015 no GitHub (main)
 - [x] T017 Botões compactos (native Btn) e zero flex-end — nada à direita
+- [x] T018 Chat popout sem action icons à direita (bHideActionIcons) + auditoria PT/EN
 
 ## Backlog
 | Item | Impacto | Esforço | Prioridade | Estado |

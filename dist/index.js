@@ -379,7 +379,7 @@ function openChatModal(opts) {
     const modal = DFL.showModal(SP_JSX.jsx(DFL.ModalRoot, { bAllowFullSize: true, closeModal: () => closeModal(), onCancel: () => closeModal(), onEscKeypress: () => closeModal(), children: SP_JSX.jsx(ChatModal, { models: opts.models, initialModel: opts.initialModel, initialPersona: opts.initialPersona, initialWebSearch: opts.initialWebSearch }) }), undefined, {
         strTitle: t("chat.modal.title"),
         bForcePopOut: true,
-        bHideActionIcons: false,
+        bHideActionIcons: true,
         bHideMainWindowForPopouts: true,
         bNeverPopOut: false,
         popupWidth: screenW,
