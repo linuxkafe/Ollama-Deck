@@ -92,6 +92,16 @@ if [ -d "$dest" ]; then
   $sudo_cmd mv "$dest" "$backup"
 fi
 
+# Stale backups contain a valid plugin.json and the Decky loader treats them as
+# installed plugins (services the OLD code). Remove every .bak.* so only the live
+# directory remains after install.
+for old in "$dest".bak.*; do
+  if [ -d "$old" ]; then
+    say "Removing stale backup $old (would be picked up by the Decky loader)"
+    $sudo_cmd rm -rf "$old"
+  fi
+done
+
 $sudo_cmd mkdir -p "$dest"
 $sudo_cmd cp -r "$tmp"/. "$dest/"
 if [ -n "$sudo_cmd" ]; then
