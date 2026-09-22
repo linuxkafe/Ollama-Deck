@@ -3,8 +3,7 @@ import {
   PanelSectionRow,
   ToggleField,
   ButtonItem,
-  staticClasses,
-  Focusable
+  staticClasses
 } from "@decky/ui";
 import { callable, definePlugin, toaster } from "@decky/api";
 import { Fragment, useEffect, useState } from "react";
@@ -577,12 +576,7 @@ function Content() {
       ) : null}
 
       {status.service_active ? (
-        <PanelSection>
-          <PanelSectionRow>
-            <Focusable noFocusRing style={{ padding: "8px 0" }}>
-              <strong>{t('lan.title')}</strong>
-            </Focusable>
-          </PanelSectionRow>
+        <PanelSection title={t('lan.title')}>
           <PanelSectionRow>
             <div style={{ color: "#8b8b8b", fontSize: "12px", marginBottom: "8px" }}>
               {t('lan.desc')}

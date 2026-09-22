@@ -111,8 +111,10 @@ function ChatModal({
   useEffect(() => {
     // Focus the textarea after the popout mounts so the SteamOS on-screen keyboard appears
     const timer = setTimeout(() => {
+      // Ensure the popout window has focus first
+      window.focus();
       inputRef.current?.focus();
-    }, 200);
+    }, 500);
     return () => clearTimeout(timer);
   }, []);
 
