@@ -6,7 +6,7 @@ import {
   staticClasses
 } from "@decky/ui";
 import { callable, definePlugin, toaster } from "@decky/api";
-import { Fragment, useEffect, useState } from "react";
+import { Fragment, useEffect, useState, useRef } from "react";
 import { FaRobot, FaDownload, FaTrash } from "react-icons/fa";
 import { t } from "./i18n";
 import { openRagModal } from "./components/RagModal";
@@ -155,6 +155,52 @@ function Content() {
   const [personaTemperature, setPersonaTemperature] = useState(0.7);
   const [personaMaxTokens, setPersonaMaxTokens] = useState(2048);
   const [personaModel, setPersonaModel] = useState("");
+  const [personaPreset, setPersonaPreset] = useState<"custom" | "pirate" | "shakespeare" | "robot">("custom");
+  const personaPromptRef = useRef<HTMLTextAreaElement>(null);
+
+  const applyPersonaPreset = (preset: "custom" | "pirate" | "shakespeare" | "robot") => {
+    setPersonaPreset(preset);
+    if (preset === "custom") return;
+    const nameKey = `persona.preset.${preset}.name`;
+    const promptKey = `persona.preset.${preset}.system_prompt`;
+    const tempKey = `persona.preset.${preset}.temperature`;
+    const tokensKey = `persona.preset.${preset}.max_tokens`;
+    setPersonaName(t(nameKey));
+    setPersonaSystemPrompt(t(promptKey));
+    setPersonaTemperature(parseFloat(t(tempKey)));
+    setPersonaMaxTokens(parseInt(t(tokensKey), 10));
+  };
+
+  useEffect(() => {
+    // Focus polling for persona system prompt textarea
+    let cancelled = false;
+    const start = Date.now();
+
+    const tryFocus = () => {
+      if (cancelled) return;
+      if (document.hasFocus()) {
+        const el = personaPromptRef.current;
+        if (el) {
+          window.focus();
+          el.focus();
+          const nav = navigator as any;
+          if (nav.virtualKeyboard && typeof nav.virtualKeyboard.show === 'function') {
+            nav.virtualKeyboard.show().catch(() => {});
+          }
+          const win = window as any;
+          if (win.SteamClient?.showKeyboard) win.SteamClient.showKeyboard().catch(() => {});
+          if (win.Steam?.showKeyboard) win.Steam.showKeyboard().catch(() => {});
+          if (win.SteamUI?.showKeyboard) win.SteamUI.showKeyboard().catch(() => {});
+          el.click();
+          el.dispatchEvent(new FocusEvent('focus', { bubbles: true }));
+        }
+      } else if (Date.now() - start < 5000) {
+        setTimeout(tryFocus, 100);
+      }
+    };
+    tryFocus();
+    return () => { cancelled = true; };
+  }, []);
 
   const refresh = async () => {
     try {
@@ -403,7 +449,7 @@ function Content() {
           }
           checked={status.service_active}
           disabled={busy}
-          onChange={(on) => run(() => setService(on))}
+          onChange={(on: boolean) => run(() => setService(on))}
         />
       </PanelSectionRow>
 
@@ -427,8 +473,13 @@ function Content() {
           }
           checked={status.keep_awake}
           disabled={busy}
-          onChange={(on) => run(() => setKeepAwake(on))}
+          onChange={(on: boolean) => run(() => setKeepAwake(on))}
         />
+      </PanelSectionRow>
+      <PanelSectionRow>
+        <div style={{ color: "#f43f5e", fontSize: "11px", padding: "4px 0", marginBottom: "8px" }}>
+          {t('keepAwake.warning')}
+        </div>
       </PanelSectionRow>
 
       <PanelSectionRow>
@@ -612,6 +663,32 @@ function Content() {
           <PanelSectionRow>
             <div style={{ color: "#8b8b8b", fontSize: "12px", marginBottom: "8px" }}>
               {t('persona.desc')}
+            </div>
+          </PanelSectionRow>
+          <PanelSectionRow>
+            <div style={{ marginBottom: "8px" }}>
+              <label style={{ display: "block", color: "#8b8b8b", fontSize: "12px", marginBottom: "4px" }}>
+                {t('persona.preset.label')}
+              </label>
+              <select
+                value={personaPreset}
+                onChange={(e) => applyPersonaPreset(e.target.value as "custom" | "pirate" | "shakespeare" | "robot")}
+                style={{
+                  width: "100%",
+                  boxSizing: "border-box",
+                  padding: "8px",
+                  borderRadius: "4px",
+                  border: "1px solid #4a4a4a",
+                  background: "#1a1a1a",
+                  color: "#fafafa",
+                  fontSize: "14px",
+                }}
+              >
+                <option value="custom">{t('persona.preset.select')}</option>
+                <option value="pirate">{t('persona.preset.pirate.name')}</option>
+                <option value="shakespeare">{t('persona.preset.shakespeare.name')}</option>
+                <option value="robot">{t('persona.preset.robot.name')}</option>
+              </select>
             </div>
           </PanelSectionRow>
           <PanelSectionRow>

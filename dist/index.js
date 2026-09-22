@@ -101,6 +101,21 @@ const translations = {
         'keepAwake.desc.active': 'Enable to prevent Deck suspend.',
         'keepAwake.desc.inactive': 'Effective while service is active.',
         'keepAwake.locked': 'Deck will not suspend while service is active.',
+        'keepAwake.warning': 'Warning: this may prevent the main menu from opening. A reboot may be required to restore.',
+        'persona.preset.label': 'Persona preset',
+        'persona.preset.select': 'Select a preset',
+        'persona.preset.pirate.name': 'Pirate',
+        'persona.preset.pirate.system_prompt': 'You are a swashbuckling pirate. Speak like a pirate, use "Arrr!", "Matey!", and nautical slang. Be bold, adventurous, and a bit mischievous.',
+        'persona.preset.pirate.temperature': '0.9',
+        'persona.preset.pirate.max_tokens': '512',
+        'persona.preset.shakespeare.name': 'Shakespeare',
+        'persona.preset.shakespeare.system_prompt': 'You are William Shakespeare. Speak in Early Modern English, using iambic pentameter when possible. Be poetic, witty, and dramatic.',
+        'persona.preset.shakespeare.temperature': '0.8',
+        'persona.preset.shakespeare.max_tokens': '512',
+        'persona.preset.robot.name': 'Robot',
+        'persona.preset.robot.system_prompt': 'You are a logical robot. Speak in a precise, literal, and monotone manner. Use "beep boop" occasionally. No emotions.',
+        'persona.preset.robot.temperature': '0.2',
+        'persona.preset.robot.max_tokens': '512',
         'autostart.label': 'Start with Steam Deck',
         'autostart.desc.active': 'Service starts with user session.',
         'autostart.desc.inactive': 'Service starts only on demand.',
@@ -225,6 +240,21 @@ const translations = {
         'keepAwake.desc.active': 'Ativar para impedir a suspensão do Deck.',
         'keepAwake.desc.inactive': 'Eficaz enquanto o serviço estiver ativo.',
         'keepAwake.locked': 'O Deck não suspende enquanto o serviço estiver ativo.',
+        'keepAwake.warning': 'Aviso: isto pode impedir a abertura do menu principal. Poderá ser necessário reiniciar para restaurar.',
+        'persona.preset.label': 'Predefinição de persona',
+        'persona.preset.select': 'Selecionar uma predefinição',
+        'persona.preset.pirate.name': 'Pirata',
+        'persona.preset.pirate.system_prompt': 'Você é um pirata saqueador. Fale como um pirata, use "Arrr!", "Camarada!" e gírias náuticas. Seja ousado, aventureiro e um pouco travesso.',
+        'persona.preset.pirate.temperature': '0.9',
+        'persona.preset.pirate.max_tokens': '512',
+        'persona.preset.shakespeare.name': 'Shakespeare',
+        'persona.preset.shakespeare.system_prompt': 'Você é William Shakespeare. Fale em inglês moderno arcaico, usando pentâmetro iâmbico quando possível. Seja poético, espirituoso e dramático.',
+        'persona.preset.shakespeare.temperature': '0.8',
+        'persona.preset.shakespeare.max_tokens': '512',
+        'persona.preset.robot.name': 'Robô',
+        'persona.preset.robot.system_prompt': 'Você é um robô lógico. Fale de forma precisa, literal e monótona. Use "bip bop" ocasionalmente. Sem emoções.',
+        'persona.preset.robot.temperature': '0.2',
+        'persona.preset.robot.max_tokens': '512',
         'autostart.label': 'Arrancar com Steam Deck',
         'autostart.desc.active': 'O serviço arranca com a sessão do utilizador.',
         'autostart.desc.inactive': 'O serviço arranca apenas por pedido.',
@@ -793,6 +823,55 @@ function Content() {
     const [personaTemperature, setPersonaTemperature] = SP_REACT.useState(0.7);
     const [personaMaxTokens, setPersonaMaxTokens] = SP_REACT.useState(2048);
     const [personaModel, setPersonaModel] = SP_REACT.useState("");
+    const [personaPreset, setPersonaPreset] = SP_REACT.useState("custom");
+    const personaPromptRef = SP_REACT.useRef(null);
+    const applyPersonaPreset = (preset) => {
+        setPersonaPreset(preset);
+        if (preset === "custom")
+            return;
+        const nameKey = `persona.preset.${preset}.name`;
+        const promptKey = `persona.preset.${preset}.system_prompt`;
+        const tempKey = `persona.preset.${preset}.temperature`;
+        const tokensKey = `persona.preset.${preset}.max_tokens`;
+        setPersonaName(t(nameKey));
+        setPersonaSystemPrompt(t(promptKey));
+        setPersonaTemperature(parseFloat(t(tempKey)));
+        setPersonaMaxTokens(parseInt(t(tokensKey), 10));
+    };
+    SP_REACT.useEffect(() => {
+        // Focus polling for persona system prompt textarea
+        let cancelled = false;
+        const start = Date.now();
+        const tryFocus = () => {
+            if (cancelled)
+                return;
+            if (document.hasFocus()) {
+                const el = personaPromptRef.current;
+                if (el) {
+                    window.focus();
+                    el.focus();
+                    const nav = navigator;
+                    if (nav.virtualKeyboard && typeof nav.virtualKeyboard.show === 'function') {
+                        nav.virtualKeyboard.show().catch(() => { });
+                    }
+                    const win = window;
+                    if (win.SteamClient?.showKeyboard)
+                        win.SteamClient.showKeyboard().catch(() => { });
+                    if (win.Steam?.showKeyboard)
+                        win.Steam.showKeyboard().catch(() => { });
+                    if (win.SteamUI?.showKeyboard)
+                        win.SteamUI.showKeyboard().catch(() => { });
+                    el.click();
+                    el.dispatchEvent(new FocusEvent('focus', { bubbles: true }));
+                }
+            }
+            else if (Date.now() - start < 5000) {
+                setTimeout(tryFocus, 100);
+            }
+        };
+        tryFocus();
+        return () => { cancelled = true; };
+    }, []);
     const refresh = async () => {
         try {
             setStatus(await getStatus());
@@ -983,13 +1062,22 @@ function Content() {
                         ? status.keep_awake_locked
                             ? t('keepAwake.desc.locked')
                             : t('keepAwake.desc.active')
-                        : t('keepAwake.desc.inactive'), checked: status.keep_awake, disabled: busy, onChange: (on) => run(() => setKeepAwake(on)) }) }), SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsx(DFL.ToggleField, { label: t('autostart.label'), description: status.autostart
+                        : t('keepAwake.desc.inactive'), checked: status.keep_awake, disabled: busy, onChange: (on) => run(() => setKeepAwake(on)) }) }), SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsx("div", { style: { color: "#f43f5e", fontSize: "11px", padding: "4px 0", marginBottom: "8px" }, children: t('keepAwake.warning') }) }), SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsx(DFL.ToggleField, { label: t('autostart.label'), description: status.autostart
                         ? t('autostart.desc.active')
                         : t('autostart.desc.inactive'), checked: status.autostart, disabled: busy, onChange: (on) => run(() => setAutostart(on)) }) }), SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsx(DFL.ToggleField, { label: t('network.label'), description: t('network.desc'), checked: networkExpose, disabled: busy || !status.service_active, onChange: (on) => run(() => setNetworkExposure(on)) }) }), status.api_url && status.service_active ? (SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsx("div", { style: { color: "#8b8b8b", fontSize: "12px", marginBottom: "8px" }, children: t('api.url', { url: status.api_url }) }) })) : null, SP_JSX.jsxs(DFL.PanelSection, { title: t('updates.title'), children: [SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsxs(DFL.ButtonItem, { layout: "below", disabled: busy, onClick: doUpdate, description: status.service_active
                                 ? t('updates.btn.update.desc.active')
                                 : t('updates.btn.update.desc.inactive'), children: [SP_JSX.jsx(FaDownload, { style: { marginRight: "8px", verticalAlign: "middle" } }), t('updates.btn.update')] }) }), SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsxs(DFL.ButtonItem, { layout: "below", disabled: busy || !status.service_active, onClick: () => setPullModalOpen(true), description: t('updates.btn.install.desc'), children: [SP_JSX.jsx(FaDownload, { style: { marginRight: "8px", verticalAlign: "middle" } }), t('updates.btn.install')] }) }), SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsx("div", { style: { color: "#8b8b8b", fontSize: "12px" }, children: busy
                                 ? t('updates.status.updating')
-                                : t('updates.status.idle', { version: status.version ?? "—", count: status.models.length }) }) })] }), status.service_active && status.models.length > 0 ? (SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsx("div", { style: { marginBottom: "8px" }, children: SP_JSX.jsxs(DFL.ButtonItem, { layout: "below", disabled: busy, onClick: handleOpenChat, description: t('chat.btn.open.desc'), children: [SP_JSX.jsx(FaRobot, { style: { marginRight: "8px", verticalAlign: "middle" } }), t('chat.btn.open')] }) }) })) : null, status.service_active ? (SP_JSX.jsxs(DFL.PanelSection, { title: t('lan.title'), children: [SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsx("div", { style: { color: "#8b8b8b", fontSize: "12px", marginBottom: "8px" }, children: t('lan.desc') }) }), lanInfoData ? (SP_JSX.jsxs(SP_JSX.Fragment, { children: [lanInfoData.warning && (SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsx("div", { style: { color: "#f43f5e", fontSize: "11px", padding: "8px", background: "#f43f5e11", borderRadius: "4px", border: "1px solid #f43f5e33", marginBottom: "8px" }, children: lanInfoData.warning }) })), SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsx("div", { style: { color: "#e6e6e6", fontSize: "12px", marginBottom: "8px" }, children: SP_JSX.jsx("strong", { children: t('lan.address', { url: lanInfoData.base_url ?? '' }) }) }) }), SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsx("div", { style: { color: "#8b8b8b", fontSize: "11px", marginBottom: "8px" }, children: t('lan.models', { models: lanInfoData.models?.join(", ") || 'none' }) }) }), SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsx("div", { style: { color: "#8b8b8b", fontSize: "11px", marginBottom: "8px" }, children: t('lan.examples') }) }), lanInfoData.examples && Object.entries(lanInfoData.examples).map(([lang, cmd]) => (SP_JSX.jsxs(SP_REACT.Fragment, { children: [SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsx("code", { style: { display: "block", width: "100%", boxSizing: "border-box", fontSize: "10px", background: "#1a1a1a", padding: "4px 8px", borderRadius: "4px", color: "#22c55e", whiteSpace: "pre-wrap", wordBreak: "break-all" }, children: cmd }) }), SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsx("div", { style: { marginBottom: "8px" }, children: SP_JSX.jsx(FocusBtn, { onClick: () => navigator.clipboard.writeText(cmd), disabled: busy, children: t('lan.btn.copy') }) }) })] }, lang)))] })) : (SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsx("div", { style: { color: "#8b8b8b", fontSize: "12px", marginBottom: "8px" }, children: t('lan.loading') }) }))] })) : null, status.models.length > 0 ? (SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsx("div", { style: { marginBottom: "8px" }, children: SP_JSX.jsxs(FocusBtn, { onClick: () => openModelsModal({ models: status.models }), children: [SP_JSX.jsx(FaTrash, { style: { marginRight: "6px", verticalAlign: "middle" } }), t('models.manage')] }) }) })) : (SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsx("div", { style: { color: "#8b8b8b", fontSize: "12px", marginBottom: "8px" }, children: t('models.empty') }) })), status.error ? (SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsx("div", { style: { color: "#f43f5e", fontSize: "12px", marginBottom: "8px" }, children: status.error }) })) : null, status.service_active && (SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsx("div", { style: { marginBottom: "8px" }, children: SP_JSX.jsxs(FocusBtn, { onClick: () => openRagModal({ config: ragConfig ? { rag_dir: ragConfig.rag_documents_dir, installed_embedding_models: ragConfig.installed_embedding_models, current_embedding_model: ragConfig.rag_embedding_model ?? null } : { rag_dir: ragDirInput, installed_embedding_models: [], current_embedding_model: null } }), children: [SP_JSX.jsx(FaDownload, { style: { marginRight: "6px", verticalAlign: "middle" } }), t('rag.title')] }) }) })), status.service_active && (SP_JSX.jsxs(DFL.PanelSection, { title: t('persona.title'), children: [SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsx("div", { style: { color: "#8b8b8b", fontSize: "12px", marginBottom: "8px" }, children: t('persona.desc') }) }), SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsx("input", { type: "text", value: personaName || persona.name, onChange: (e) => setPersonaName(e.target.value), placeholder: t('persona.name.placeholder'), style: {
+                                : t('updates.status.idle', { version: status.version ?? "—", count: status.models.length }) }) })] }), status.service_active && status.models.length > 0 ? (SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsx("div", { style: { marginBottom: "8px" }, children: SP_JSX.jsxs(DFL.ButtonItem, { layout: "below", disabled: busy, onClick: handleOpenChat, description: t('chat.btn.open.desc'), children: [SP_JSX.jsx(FaRobot, { style: { marginRight: "8px", verticalAlign: "middle" } }), t('chat.btn.open')] }) }) })) : null, status.service_active ? (SP_JSX.jsxs(DFL.PanelSection, { title: t('lan.title'), children: [SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsx("div", { style: { color: "#8b8b8b", fontSize: "12px", marginBottom: "8px" }, children: t('lan.desc') }) }), lanInfoData ? (SP_JSX.jsxs(SP_JSX.Fragment, { children: [lanInfoData.warning && (SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsx("div", { style: { color: "#f43f5e", fontSize: "11px", padding: "8px", background: "#f43f5e11", borderRadius: "4px", border: "1px solid #f43f5e33", marginBottom: "8px" }, children: lanInfoData.warning }) })), SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsx("div", { style: { color: "#e6e6e6", fontSize: "12px", marginBottom: "8px" }, children: SP_JSX.jsx("strong", { children: t('lan.address', { url: lanInfoData.base_url ?? '' }) }) }) }), SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsx("div", { style: { color: "#8b8b8b", fontSize: "11px", marginBottom: "8px" }, children: t('lan.models', { models: lanInfoData.models?.join(", ") || 'none' }) }) }), SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsx("div", { style: { color: "#8b8b8b", fontSize: "11px", marginBottom: "8px" }, children: t('lan.examples') }) }), lanInfoData.examples && Object.entries(lanInfoData.examples).map(([lang, cmd]) => (SP_JSX.jsxs(SP_REACT.Fragment, { children: [SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsx("code", { style: { display: "block", width: "100%", boxSizing: "border-box", fontSize: "10px", background: "#1a1a1a", padding: "4px 8px", borderRadius: "4px", color: "#22c55e", whiteSpace: "pre-wrap", wordBreak: "break-all" }, children: cmd }) }), SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsx("div", { style: { marginBottom: "8px" }, children: SP_JSX.jsx(FocusBtn, { onClick: () => navigator.clipboard.writeText(cmd), disabled: busy, children: t('lan.btn.copy') }) }) })] }, lang)))] })) : (SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsx("div", { style: { color: "#8b8b8b", fontSize: "12px", marginBottom: "8px" }, children: t('lan.loading') }) }))] })) : null, status.models.length > 0 ? (SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsx("div", { style: { marginBottom: "8px" }, children: SP_JSX.jsxs(FocusBtn, { onClick: () => openModelsModal({ models: status.models }), children: [SP_JSX.jsx(FaTrash, { style: { marginRight: "6px", verticalAlign: "middle" } }), t('models.manage')] }) }) })) : (SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsx("div", { style: { color: "#8b8b8b", fontSize: "12px", marginBottom: "8px" }, children: t('models.empty') }) })), status.error ? (SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsx("div", { style: { color: "#f43f5e", fontSize: "12px", marginBottom: "8px" }, children: status.error }) })) : null, status.service_active && (SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsx("div", { style: { marginBottom: "8px" }, children: SP_JSX.jsxs(FocusBtn, { onClick: () => openRagModal({ config: ragConfig ? { rag_dir: ragConfig.rag_documents_dir, installed_embedding_models: ragConfig.installed_embedding_models, current_embedding_model: ragConfig.rag_embedding_model ?? null } : { rag_dir: ragDirInput, installed_embedding_models: [], current_embedding_model: null } }), children: [SP_JSX.jsx(FaDownload, { style: { marginRight: "6px", verticalAlign: "middle" } }), t('rag.title')] }) }) })), status.service_active && (SP_JSX.jsxs(DFL.PanelSection, { title: t('persona.title'), children: [SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsx("div", { style: { color: "#8b8b8b", fontSize: "12px", marginBottom: "8px" }, children: t('persona.desc') }) }), SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsxs("div", { style: { marginBottom: "8px" }, children: [SP_JSX.jsx("label", { style: { display: "block", color: "#8b8b8b", fontSize: "12px", marginBottom: "4px" }, children: t('persona.preset.label') }), SP_JSX.jsxs("select", { value: personaPreset, onChange: (e) => applyPersonaPreset(e.target.value), style: {
+                                        width: "100%",
+                                        boxSizing: "border-box",
+                                        padding: "8px",
+                                        borderRadius: "4px",
+                                        border: "1px solid #4a4a4a",
+                                        background: "#1a1a1a",
+                                        color: "#fafafa",
+                                        fontSize: "14px",
+                                    }, children: [SP_JSX.jsx("option", { value: "custom", children: t('persona.preset.select') }), SP_JSX.jsx("option", { value: "pirate", children: t('persona.preset.pirate.name') }), SP_JSX.jsx("option", { value: "shakespeare", children: t('persona.preset.shakespeare.name') }), SP_JSX.jsx("option", { value: "robot", children: t('persona.preset.robot.name') })] })] }) }), SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsx("input", { type: "text", value: personaName || persona.name, onChange: (e) => setPersonaName(e.target.value), placeholder: t('persona.name.placeholder'), style: {
                                 width: "100%",
                                 boxSizing: "border-box",
                                 padding: "8px",
