@@ -117,3 +117,17 @@ Registo de aprendizagens relevantes da análise hostil (fase de plan).
 - **Applied To**: ChatModal footer (Enviar), RAG dir (Guardar), LAN (Copiar), Biblioteca
   (Instalar), Embedding (Usar), Modelos (Apagar/Confirmar).
 - **Date**: 2026-09-22
+
+## [UI] — Botões de ação: compactos à esquerda (sem flex-end, sem ButtonItem inline)
+- **Task**: T017
+- **Insight**: mesmo com o empilhamento (T015), o utilizador rejeita botões alinhados à
+  direita ("o botão copiar também continua à direita") e os `ButtonItem` do Decky renderizam
+  largos/monstruosos quando isolados. Regra final: **zero `justify-content: flex-end`** em
+  `src/`; ações em `<button>` nativo compacto (largura=conteúdo) alinhado à esquerda;
+  primárias full-width (`layout="below"`) mantêm-se (não são "à direita").
+- **Origin**: greps do estado publicado + report iterativo do utilizador (3ª iteração).
+- **Impact**: eliminação total de botões na margem direita; largura controlada por conteúdo.
+  Trade-off: focus navigation nativa (gamepad) deixa de se aplicar a estes botões.
+- **Applied To**: `src/components/ui.tsx` (helper `Btn`); chat send, LAN copy, RAG save,
+  library install, embedding use/install, models delete/confirm, pull modal, persona footer.
+- **Date**: 2026-09-22

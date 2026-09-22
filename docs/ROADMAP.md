@@ -12,6 +12,8 @@
 - [x] T013 Chat em janela separada a ecrã completo (popout dimensionado) + layout sem deslocação
 - [x] T014 Publicação T013 no GitHub (main) — instalável via `curl install.sh`
 - [x] T015 Regra: sem botões à direita de campos (UI empilhado, campos 100%)
+- [x] T016 Publicação T015 no GitHub (main)
+- [x] T017 Botões compactos (native Btn) e zero flex-end — nada à direita
 
 ## Backlog
 | Item | Impacto | Esforço | Prioridade | Estado |
