@@ -502,6 +502,44 @@ function ModelsModal({ models: initialModels }) {
     const [search, setSearch] = SP_REACT.useState("");
     const [filtered, setFiltered] = SP_REACT.useState(initialModels);
     const listEndRef = SP_REACT.useRef(null);
+    const searchInputRef = SP_REACT.useRef(null);
+    const pullInputRef = SP_REACT.useRef(null);
+    SP_REACT.useEffect(() => {
+        // Wait until the popout window actually has focus, then focus the search input + trigger keyboard
+        let cancelled = false;
+        const maxWait = 5000;
+        const interval = 100;
+        const start = Date.now();
+        const tryFocus = () => {
+            if (cancelled)
+                return;
+            if (document.hasFocus()) {
+                const el = searchInputRef.current;
+                if (el) {
+                    window.focus();
+                    el.focus();
+                    const nav = navigator;
+                    if (nav.virtualKeyboard && typeof nav.virtualKeyboard.show === 'function') {
+                        nav.virtualKeyboard.show().catch(() => { });
+                    }
+                    const win = window;
+                    if (win.SteamClient?.showKeyboard)
+                        win.SteamClient.showKeyboard().catch(() => { });
+                    if (win.Steam?.showKeyboard)
+                        win.Steam.showKeyboard().catch(() => { });
+                    if (win.SteamUI?.showKeyboard)
+                        win.SteamUI.showKeyboard().catch(() => { });
+                    el.click();
+                    el.dispatchEvent(new FocusEvent('focus', { bubbles: true }));
+                }
+            }
+            else if (Date.now() - start < maxWait) {
+                setTimeout(tryFocus, interval);
+            }
+        };
+        tryFocus();
+        return () => { cancelled = true; };
+    }, []);
     SP_REACT.useEffect(() => {
         setFiltered(models.filter(m => m.name.toLowerCase().includes(search.toLowerCase())));
     }, [search, models]);
@@ -549,7 +587,7 @@ function ModelsModal({ models: initialModels }) {
             setBusy(false);
         }
     };
-    return (SP_JSX.jsxs("div", { style: { display: "flex", flexDirection: "column", height: "100%", minHeight: "70vh", width: "100%", boxSizing: "border-box", overflow: "hidden", background: "#0a0a0a" }, children: [SP_JSX.jsx("div", { style: { padding: "12px 16px", borderBottom: "1px solid #4a4a4a", background: "#1a1a1a" }, children: SP_JSX.jsxs("div", { style: { display: "flex", flexDirection: "column", gap: "10px" }, children: [SP_JSX.jsxs("div", { style: { display: "flex", gap: "8px", flexWrap: "wrap" }, children: [SP_JSX.jsx("input", { type: "text", value: search, onChange: e => setSearch(e.target.value), placeholder: t("library.search.placeholder"), style: { flex: 1, minWidth: "200px", padding: "10px 12px", borderRadius: "6px", border: "1px solid #4a4a4a", background: "#0a0a0a", color: "#fafafa", fontSize: "16px" } }), SP_JSX.jsxs(FocusBtn, { onClick: doPull, disabled: busy || !pullName.trim(), children: [SP_JSX.jsx(FaDownload, { style: { marginRight: "6px", verticalAlign: "middle" } }), t("updates.btn.install")] })] }), SP_JSX.jsx("input", { type: "text", value: pullName, onChange: e => setPullName(e.target.value), placeholder: t("updates.btn.install.desc"), disabled: busy, style: { width: "100%", boxSizing: "border-box", padding: "10px 12px", borderRadius: "6px", border: "1px solid #4a4a4a", background: "#0a0a0a", color: "#fafafa", fontSize: "16px" } })] }) }), SP_JSX.jsxs("div", { style: { flex: 1, minHeight: 0, overflowY: "auto", padding: "16px" }, children: [filtered.length === 0 && (SP_JSX.jsx("div", { style: { color: "#8b8b8b", textAlign: "center", padding: "40px 16px" }, children: t("library.empty") })), filtered.map((m) => (SP_JSX.jsxs("div", { style: { marginBottom: "12px", padding: "12px", borderRadius: "8px", background: "#1a1a1a", border: "1px solid #4a4a4a", display: "flex", flexDirection: "column", gap: "8px" }, children: [SP_JSX.jsxs("div", { style: { display: "flex", justifyContent: "space-between", alignItems: "center" }, children: [SP_JSX.jsx("strong", { style: { fontSize: "16px" }, children: m.name }), SP_JSX.jsx("div", { style: { display: "flex", gap: "8px" }, children: SP_JSX.jsxs(FocusBtn, { onClick: () => doDelete(m.name), disabled: busy, style: { color: "#f43f5e", borderColor: "#f43f5e" }, children: [SP_JSX.jsx(FaTrash, { style: { marginRight: "6px", verticalAlign: "middle" } }), t("delete.btn.confirm")] }) })] }), SP_JSX.jsxs("div", { style: { color: "#8b8b8b", fontSize: "12px" }, children: [m.family, " \u00B7 ", m.quant, " \u00B7 ", (m.size / (1024 * 1024 * 1024)).toFixed(1), " GB"] })] }, m.name))), SP_JSX.jsx("div", { ref: listEndRef })] })] }));
+    return (SP_JSX.jsxs("div", { style: { display: "flex", flexDirection: "column", height: "100%", minHeight: "70vh", width: "100%", boxSizing: "border-box", overflow: "hidden", background: "#0a0a0a" }, children: [SP_JSX.jsx("div", { style: { padding: "12px 16px", borderBottom: "1px solid #4a4a4a", background: "#1a1a1a" }, children: SP_JSX.jsxs("div", { style: { display: "flex", flexDirection: "column", gap: "10px" }, children: [SP_JSX.jsxs("div", { style: { display: "flex", gap: "8px", flexWrap: "wrap" }, children: [SP_JSX.jsx("input", { ref: searchInputRef, type: "text", value: search, onChange: e => setSearch(e.target.value), placeholder: t("library.search.placeholder"), style: { flex: 1, minWidth: "200px", padding: "10px 12px", borderRadius: "6px", border: "1px solid #4a4a4a", background: "#0a0a0a", color: "#fafafa", fontSize: "16px" } }), SP_JSX.jsxs(FocusBtn, { onClick: doPull, disabled: busy || !pullName.trim(), children: [SP_JSX.jsx(FaDownload, { style: { marginRight: "6px", verticalAlign: "middle" } }), t("updates.btn.install")] })] }), SP_JSX.jsx("input", { ref: pullInputRef, type: "text", value: pullName, onChange: e => setPullName(e.target.value), placeholder: t("updates.btn.install.desc"), disabled: busy, style: { width: "100%", boxSizing: "border-box", padding: "10px 12px", borderRadius: "6px", border: "1px solid #4a4a4a", background: "#0a0a0a", color: "#fafafa", fontSize: "16px" } })] }) }), SP_JSX.jsxs("div", { style: { flex: 1, minHeight: 0, overflowY: "auto", padding: "16px" }, children: [filtered.length === 0 && (SP_JSX.jsx("div", { style: { color: "#8b8b8b", textAlign: "center", padding: "40px 16px" }, children: t("library.empty") })), filtered.map((m) => (SP_JSX.jsxs("div", { style: { marginBottom: "12px", padding: "12px", borderRadius: "8px", background: "#1a1a1a", border: "1px solid #4a4a4a", display: "flex", flexDirection: "column", gap: "8px" }, children: [SP_JSX.jsxs("div", { style: { display: "flex", justifyContent: "space-between", alignItems: "center" }, children: [SP_JSX.jsx("strong", { style: { fontSize: "16px" }, children: m.name }), SP_JSX.jsx("div", { style: { display: "flex", gap: "8px" }, children: SP_JSX.jsxs(FocusBtn, { onClick: () => doDelete(m.name), disabled: busy, style: { color: "#f43f5e", borderColor: "#f43f5e" }, children: [SP_JSX.jsx(FaTrash, { style: { marginRight: "6px", verticalAlign: "middle" } }), t("delete.btn.confirm")] }) })] }), SP_JSX.jsxs("div", { style: { color: "#8b8b8b", fontSize: "12px" }, children: [m.family, " \u00B7 ", m.quant, " \u00B7 ", (m.size / (1024 * 1024 * 1024)).toFixed(1), " GB"] })] }, m.name))), SP_JSX.jsx("div", { ref: listEndRef })] })] }));
 }
 
 const chat = callable("chat");
@@ -715,7 +753,6 @@ const setKeepAwake = callable("set_keep_awake");
 const updateAll = callable("update_all");
 const pullModel = callable("pull_model");
 const lanInfo = callable("lan_info");
-const searchModels = callable("search_models");
 const getRagConfig = callable("get_rag_config");
 const setNetworkExposure = callable("set_network_exposure");
 const getPersona = callable("get_persona");
@@ -746,10 +783,6 @@ function Content() {
     const [chatModel, setChatModel] = SP_REACT.useState("");
     const [lanInfoData, setLanInfoData] = SP_REACT.useState(null);
     const [lanInfoLoaded, setLanInfoLoaded] = SP_REACT.useState(false);
-    const [librarySearch, setLibrarySearch] = SP_REACT.useState("");
-    const [libraryTags, setLibraryTags] = SP_REACT.useState([]);
-    const [libraryResults, setLibraryResults] = SP_REACT.useState([]);
-    const [libraryLoading, setLibraryLoading] = SP_REACT.useState(false);
     const [ragConfig, setRagConfigState] = SP_REACT.useState(null);
     const [ragDirInput, setRagDirInput] = SP_REACT.useState("");
     const [networkExpose, setNetworkExpose] = SP_REACT.useState(false);
@@ -873,25 +906,9 @@ function Content() {
             if (status.models.length > 0 && !chatModel) {
                 setChatModel(status.models[0].name);
             }
-            loadLibrarySearch();
             loadRagConfig();
         }
     }, [status?.service_active, status?.models]);
-    const loadLibrarySearch = async () => {
-        setLibraryLoading(true);
-        try {
-            const res = await searchModels(librarySearch, libraryTags.length > 0 ? libraryTags : undefined);
-            if (res.ok) {
-                setLibraryResults(res.models);
-            }
-        }
-        catch (err) {
-            console.error("search_models failed", err);
-        }
-        finally {
-            setLibraryLoading(false);
-        }
-    };
     const loadRagConfig = async () => {
         try {
             const res = await getRagConfig();
@@ -902,37 +919,6 @@ function Content() {
         }
         catch (err) {
             console.error("get_rag_config failed", err);
-        }
-    };
-    const doLibraryInstall = async (modelName) => {
-        setBusy(true);
-        try {
-            const res = await pullModel(modelName);
-            if (!res.ok) {
-                toaster.toast({
-                    title: t('toast.install.failed'),
-                    body: res.error || t('toast.install.error', { model: modelName }),
-                    critical: true,
-                });
-            }
-            else {
-                toaster.toast({
-                    title: t('toast.model.installed'),
-                    body: modelName,
-                });
-                await loadLibrarySearch();
-            }
-        }
-        catch (err) {
-            toaster.toast({
-                title: t('toast.install.failed'),
-                body: String(err),
-                critical: true,
-            });
-        }
-        finally {
-            setBusy(false);
-            await refresh();
         }
     };
     const doUpdate = async () => {
@@ -1003,46 +989,7 @@ function Content() {
                                 ? t('updates.btn.update.desc.active')
                                 : t('updates.btn.update.desc.inactive'), children: [SP_JSX.jsx(FaDownload, { style: { marginRight: "8px", verticalAlign: "middle" } }), t('updates.btn.update')] }) }), SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsxs(DFL.ButtonItem, { layout: "below", disabled: busy || !status.service_active, onClick: () => setPullModalOpen(true), description: t('updates.btn.install.desc'), children: [SP_JSX.jsx(FaDownload, { style: { marginRight: "8px", verticalAlign: "middle" } }), t('updates.btn.install')] }) }), SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsx("div", { style: { color: "#8b8b8b", fontSize: "12px" }, children: busy
                                 ? t('updates.status.updating')
-                                : t('updates.status.idle', { version: status.version ?? "—", count: status.models.length }) }) })] }), status.service_active && status.models.length > 0 ? (SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsx("div", { style: { marginBottom: "8px" }, children: SP_JSX.jsxs(DFL.ButtonItem, { layout: "below", disabled: busy, onClick: handleOpenChat, description: t('chat.btn.open.desc'), children: [SP_JSX.jsx(FaRobot, { style: { marginRight: "8px", verticalAlign: "middle" } }), t('chat.btn.open')] }) }) })) : null, status.service_active ? (SP_JSX.jsxs(DFL.PanelSection, { title: t('lan.title'), children: [SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsx("div", { style: { color: "#8b8b8b", fontSize: "12px", marginBottom: "8px" }, children: t('lan.desc') }) }), lanInfoData ? (SP_JSX.jsxs(SP_JSX.Fragment, { children: [lanInfoData.warning && (SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsx("div", { style: { color: "#f43f5e", fontSize: "11px", padding: "8px", background: "#f43f5e11", borderRadius: "4px", border: "1px solid #f43f5e33", marginBottom: "8px" }, children: lanInfoData.warning }) })), SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsx("div", { style: { color: "#e6e6e6", fontSize: "12px", marginBottom: "8px" }, children: SP_JSX.jsx("strong", { children: t('lan.address', { url: lanInfoData.base_url ?? '' }) }) }) }), SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsx("div", { style: { color: "#8b8b8b", fontSize: "11px", marginBottom: "8px" }, children: t('lan.models', { models: lanInfoData.models?.join(", ") || 'none' }) }) }), SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsx("div", { style: { color: "#8b8b8b", fontSize: "11px", marginBottom: "8px" }, children: t('lan.examples') }) }), lanInfoData.examples && Object.entries(lanInfoData.examples).map(([lang, cmd]) => (SP_JSX.jsxs(SP_REACT.Fragment, { children: [SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsx("code", { style: { display: "block", width: "100%", boxSizing: "border-box", fontSize: "10px", background: "#1a1a1a", padding: "4px 8px", borderRadius: "4px", color: "#22c55e", whiteSpace: "pre-wrap", wordBreak: "break-all" }, children: cmd }) }), SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsx("div", { style: { marginBottom: "8px" }, children: SP_JSX.jsx(FocusBtn, { onClick: () => navigator.clipboard.writeText(cmd), disabled: busy, children: t('lan.btn.copy') }) }) })] }, lang)))] })) : (SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsx("div", { style: { color: "#8b8b8b", fontSize: "12px", marginBottom: "8px" }, children: t('lan.loading') }) }))] })) : null, status.models.length > 0 ? (SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsx("div", { style: { marginBottom: "8px" }, children: SP_JSX.jsxs(FocusBtn, { onClick: () => openModelsModal({ models: status.models }), children: [SP_JSX.jsx(FaTrash, { style: { marginRight: "6px", verticalAlign: "middle" } }), t('models.manage')] }) }) })) : (SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsx("div", { style: { color: "#8b8b8b", fontSize: "12px", marginBottom: "8px" }, children: t('models.empty') }) })), status.error ? (SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsx("div", { style: { color: "#f43f5e", fontSize: "12px", marginBottom: "8px" }, children: status.error }) })) : null, status.service_active && (SP_JSX.jsxs(DFL.PanelSection, { title: t('library.title'), children: [SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsx("div", { style: { color: "#8b8b8b", fontSize: "12px", marginBottom: "8px" }, children: t('library.desc') }) }), SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsx("input", { type: "text", value: librarySearch, onChange: (e) => setLibrarySearch(e.target.value), placeholder: t('library.search.placeholder'), style: {
-                                width: "100%",
-                                boxSizing: "border-box",
-                                padding: "8px",
-                                borderRadius: "4px",
-                                border: "1px solid #4a4a4a",
-                                background: "#1a1a1a",
-                                color: "#fafafa",
-                                fontSize: "14px",
-                                marginBottom: "8px",
-                            } }) }), SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsx("div", { style: { display: "flex", gap: "4px", flexWrap: "wrap", marginBottom: "8px" }, children: ["all", "chat", "code", "embedding", "vision", "tools"].map((tag) => {
-                                const isActive = tag === "all" ? libraryTags.length === 0 : libraryTags.includes(tag);
-                                const tagKey = `library.tags.${tag}`;
-                                return (SP_JSX.jsx("button", { onClick: () => {
-                                        if (tag === "all") {
-                                            setLibraryTags([]);
-                                        }
-                                        else if (libraryTags.includes(tag)) {
-                                            setLibraryTags(libraryTags.filter((t) => t !== tag));
-                                        }
-                                        else {
-                                            setLibraryTags([...libraryTags, tag]);
-                                        }
-                                    }, style: {
-                                        display: "inline-block",
-                                        width: "auto",
-                                        minWidth: 0,
-                                        flex: "0 0 auto",
-                                        flexShrink: 0,
-                                        boxSizing: "border-box",
-                                        padding: "4px 10px",
-                                        borderRadius: "4px",
-                                        border: isActive ? "1px solid #22c55e" : "1px solid #4a4a4a",
-                                        background: isActive ? "#22c55e22" : "#1a1a1a",
-                                        color: isActive ? "#22c55e" : "#e6e6e6",
-                                        fontSize: "12px",
-                                        cursor: "pointer",
-                                        whiteSpace: "nowrap",
-                                    }, children: t(tagKey) }, tag));
-                            }) }) }), libraryLoading ? (SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsx("div", { style: { color: "#8b8b8b", fontSize: "12px", textAlign: "center", padding: "16px" }, children: t('library.loading') }) })) : (SP_JSX.jsx(SP_JSX.Fragment, { children: libraryResults.length > 0 ? (libraryResults.map((m) => (SP_JSX.jsxs(SP_REACT.Fragment, { children: [SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsxs("div", { style: { marginBottom: "8px" }, children: [SP_JSX.jsx("div", { style: { color: "#e6e6e6", fontWeight: 500 }, children: m.name }), SP_JSX.jsx("div", { style: { color: "#8b8b8b", fontSize: "11px" }, children: m.description }), SP_JSX.jsx("div", { style: { display: "flex", gap: "4px", marginTop: "4px" }, children: m.tags.map((t) => (SP_JSX.jsx("span", { style: { fontSize: "10px", padding: "2px 6px", background: "#22c55e22", borderRadius: "3px", color: "#22c55e" }, children: t }, t))) })] }) }), SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsx("div", { style: { marginBottom: "8px" }, children: SP_JSX.jsx(FocusBtn, { onClick: () => doLibraryInstall(m.name), disabled: busy, children: t('library.btn.install') }) }) })] }, m.name)))) : (SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsx("div", { style: { color: "#8b8b8b", fontSize: "12px", textAlign: "center", padding: "16px" }, children: t('library.empty') }) })) })), SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsx("div", { style: { color: "#8b8b8b", fontSize: "11px", marginTop: "8px" }, children: t('library.hint') }) })] })), status.service_active && (SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsx("div", { style: { marginBottom: "8px" }, children: SP_JSX.jsxs(FocusBtn, { onClick: () => openRagModal({ config: ragConfig ? { rag_dir: ragConfig.rag_documents_dir, installed_embedding_models: ragConfig.installed_embedding_models, current_embedding_model: ragConfig.rag_embedding_model ?? null } : { rag_dir: ragDirInput, installed_embedding_models: [], current_embedding_model: null } }), children: [SP_JSX.jsx(FaDownload, { style: { marginRight: "6px", verticalAlign: "middle" } }), t('rag.title')] }) }) })), status.service_active && (SP_JSX.jsxs(DFL.PanelSection, { title: t('persona.title'), children: [SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsx("div", { style: { color: "#8b8b8b", fontSize: "12px", marginBottom: "8px" }, children: t('persona.desc') }) }), SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsx("input", { type: "text", value: personaName || persona.name, onChange: (e) => setPersonaName(e.target.value), placeholder: t('persona.name.placeholder'), style: {
+                                : t('updates.status.idle', { version: status.version ?? "—", count: status.models.length }) }) })] }), status.service_active && status.models.length > 0 ? (SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsx("div", { style: { marginBottom: "8px" }, children: SP_JSX.jsxs(DFL.ButtonItem, { layout: "below", disabled: busy, onClick: handleOpenChat, description: t('chat.btn.open.desc'), children: [SP_JSX.jsx(FaRobot, { style: { marginRight: "8px", verticalAlign: "middle" } }), t('chat.btn.open')] }) }) })) : null, status.service_active ? (SP_JSX.jsxs(DFL.PanelSection, { title: t('lan.title'), children: [SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsx("div", { style: { color: "#8b8b8b", fontSize: "12px", marginBottom: "8px" }, children: t('lan.desc') }) }), lanInfoData ? (SP_JSX.jsxs(SP_JSX.Fragment, { children: [lanInfoData.warning && (SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsx("div", { style: { color: "#f43f5e", fontSize: "11px", padding: "8px", background: "#f43f5e11", borderRadius: "4px", border: "1px solid #f43f5e33", marginBottom: "8px" }, children: lanInfoData.warning }) })), SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsx("div", { style: { color: "#e6e6e6", fontSize: "12px", marginBottom: "8px" }, children: SP_JSX.jsx("strong", { children: t('lan.address', { url: lanInfoData.base_url ?? '' }) }) }) }), SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsx("div", { style: { color: "#8b8b8b", fontSize: "11px", marginBottom: "8px" }, children: t('lan.models', { models: lanInfoData.models?.join(", ") || 'none' }) }) }), SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsx("div", { style: { color: "#8b8b8b", fontSize: "11px", marginBottom: "8px" }, children: t('lan.examples') }) }), lanInfoData.examples && Object.entries(lanInfoData.examples).map(([lang, cmd]) => (SP_JSX.jsxs(SP_REACT.Fragment, { children: [SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsx("code", { style: { display: "block", width: "100%", boxSizing: "border-box", fontSize: "10px", background: "#1a1a1a", padding: "4px 8px", borderRadius: "4px", color: "#22c55e", whiteSpace: "pre-wrap", wordBreak: "break-all" }, children: cmd }) }), SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsx("div", { style: { marginBottom: "8px" }, children: SP_JSX.jsx(FocusBtn, { onClick: () => navigator.clipboard.writeText(cmd), disabled: busy, children: t('lan.btn.copy') }) }) })] }, lang)))] })) : (SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsx("div", { style: { color: "#8b8b8b", fontSize: "12px", marginBottom: "8px" }, children: t('lan.loading') }) }))] })) : null, status.models.length > 0 ? (SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsx("div", { style: { marginBottom: "8px" }, children: SP_JSX.jsxs(FocusBtn, { onClick: () => openModelsModal({ models: status.models }), children: [SP_JSX.jsx(FaTrash, { style: { marginRight: "6px", verticalAlign: "middle" } }), t('models.manage')] }) }) })) : (SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsx("div", { style: { color: "#8b8b8b", fontSize: "12px", marginBottom: "8px" }, children: t('models.empty') }) })), status.error ? (SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsx("div", { style: { color: "#f43f5e", fontSize: "12px", marginBottom: "8px" }, children: status.error }) })) : null, status.service_active && (SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsx("div", { style: { marginBottom: "8px" }, children: SP_JSX.jsxs(FocusBtn, { onClick: () => openRagModal({ config: ragConfig ? { rag_dir: ragConfig.rag_documents_dir, installed_embedding_models: ragConfig.installed_embedding_models, current_embedding_model: ragConfig.rag_embedding_model ?? null } : { rag_dir: ragDirInput, installed_embedding_models: [], current_embedding_model: null } }), children: [SP_JSX.jsx(FaDownload, { style: { marginRight: "6px", verticalAlign: "middle" } }), t('rag.title')] }) }) })), status.service_active && (SP_JSX.jsxs(DFL.PanelSection, { title: t('persona.title'), children: [SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsx("div", { style: { color: "#8b8b8b", fontSize: "12px", marginBottom: "8px" }, children: t('persona.desc') }) }), SP_JSX.jsx(DFL.PanelSectionRow, { children: SP_JSX.jsx("input", { type: "text", value: personaName || persona.name, onChange: (e) => setPersonaName(e.target.value), placeholder: t('persona.name.placeholder'), style: {
                                 width: "100%",
                                 boxSizing: "border-box",
                                 padding: "8px",

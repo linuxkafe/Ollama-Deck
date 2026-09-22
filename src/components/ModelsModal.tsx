@@ -55,6 +55,41 @@ function ModelsModal({ models: initialModels }: { models: ModelInfo[] }) {
   const [search, setSearch] = useState("");
   const [filtered, setFiltered] = useState<ModelInfo[]>(initialModels);
   const listEndRef = useRef<HTMLDivElement>(null);
+  const searchInputRef = useRef<HTMLInputElement>(null);
+  const pullInputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    // Wait until the popout window actually has focus, then focus the search input + trigger keyboard
+    let cancelled = false;
+    const maxWait = 5000;
+    const interval = 100;
+    const start = Date.now();
+
+    const tryFocus = () => {
+      if (cancelled) return;
+      if (document.hasFocus()) {
+        const el = searchInputRef.current;
+        if (el) {
+          window.focus();
+          el.focus();
+          const nav = navigator as any;
+          if (nav.virtualKeyboard && typeof nav.virtualKeyboard.show === 'function') {
+            nav.virtualKeyboard.show().catch(() => {});
+          }
+          const win = window as any;
+          if (win.SteamClient?.showKeyboard) win.SteamClient.showKeyboard().catch(() => {});
+          if (win.Steam?.showKeyboard) win.Steam.showKeyboard().catch(() => {});
+          if (win.SteamUI?.showKeyboard) win.SteamUI.showKeyboard().catch(() => {});
+          el.click();
+          el.dispatchEvent(new FocusEvent('focus', { bubbles: true }));
+        }
+      } else if (Date.now() - start < maxWait) {
+        setTimeout(tryFocus, interval);
+      }
+    };
+    tryFocus();
+    return () => { cancelled = true; };
+  }, []);
 
   useEffect(() => {
     setFiltered(models.filter(m => m.name.toLowerCase().includes(search.toLowerCase())));
@@ -104,6 +139,7 @@ function ModelsModal({ models: initialModels }: { models: ModelInfo[] }) {
         <div style={{ display: "flex", flexDirection: "column", gap: "10px" }}>
           <div style={{ display: "flex", gap: "8px", flexWrap: "wrap" }}>
             <input
+              ref={searchInputRef}
               type="text"
               value={search}
               onChange={e => setSearch(e.target.value)}
@@ -116,6 +152,7 @@ function ModelsModal({ models: initialModels }: { models: ModelInfo[] }) {
             </FocusBtn>
           </div>
           <input
+            ref={pullInputRef}
             type="text"
             value={pullName}
             onChange={e => setPullName(e.target.value)}

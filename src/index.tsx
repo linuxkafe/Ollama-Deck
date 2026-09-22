@@ -66,19 +66,7 @@ type LanInfoResult = {
   error?: string;
 };
 
-type LibraryModel = {
-  name: string;
-  tags: string[];
-  sizes: string[];
-  description: string;
-};
 
-type SearchModelsResult = {
-  ok: boolean;
-  models: LibraryModel[];
-  total: number;
-  error?: string;
-};
 
 type RagConfigResult = {
   ok: boolean;
@@ -117,7 +105,7 @@ const setKeepAwake = callable<[on: boolean], { ok: boolean }>("set_keep_awake");
 const updateAll = callable<[], UpdateResult>("update_all");
 const pullModel = callable<[tag: string], { ok: boolean; error?: string }>("pull_model");
 const lanInfo = callable<[], LanInfoResult>("lan_info");
-const searchModels = callable<[query?: string, tags?: string[]], SearchModelsResult>("search_models");
+
 const getRagConfig = callable<[], RagConfigResult>("get_rag_config");
 const setNetworkExposure = callable<[expose: boolean], NetworkExposureResult>("set_network_exposure");
 const getPersona = callable<[], PersonaResult>("get_persona");
@@ -157,10 +145,6 @@ function Content() {
   const [chatModel, setChatModel] = useState("");
   const [lanInfoData, setLanInfoData] = useState<LanInfoResult | null>(null);
   const [lanInfoLoaded, setLanInfoLoaded] = useState(false);
-  const [librarySearch, setLibrarySearch] = useState("");
-  const [libraryTags, setLibraryTags] = useState<string[]>([]);
-  const [libraryResults, setLibraryResults] = useState<LibraryModel[]>([]);
-  const [libraryLoading, setLibraryLoading] = useState(false);
   const [ragConfig, setRagConfigState] = useState<RagConfigResult | null>(null);
   const [ragDirInput, setRagDirInput] = useState("");
   const [networkExpose, setNetworkExpose] = useState(false);
@@ -282,24 +266,9 @@ function Content() {
       if (status.models.length > 0 && !chatModel) {
         setChatModel(status.models[0].name);
       }
-      loadLibrarySearch();
       loadRagConfig();
     }
   }, [status?.service_active, status?.models]);
-
-  const loadLibrarySearch = async () => {
-    setLibraryLoading(true);
-    try {
-      const res = await searchModels(librarySearch, libraryTags.length > 0 ? libraryTags : undefined);
-      if (res.ok) {
-        setLibraryResults(res.models);
-      }
-    } catch (err) {
-      console.error("search_models failed", err);
-    } finally {
-      setLibraryLoading(false);
-    }
-  };
 
   const loadRagConfig = async () => {
     try {
@@ -310,35 +279,6 @@ function Content() {
       }
     } catch (err) {
       console.error("get_rag_config failed", err);
-    }
-  };
-
-  const doLibraryInstall = async (modelName: string) => {
-    setBusy(true);
-    try {
-      const res = await pullModel(modelName);
-      if (!res.ok) {
-        toaster.toast({
-          title: t('toast.install.failed'),
-          body: res.error || t('toast.install.error', { model: modelName }),
-          critical: true,
-        });
-      } else {
-        toaster.toast({
-          title: t('toast.model.installed'),
-          body: modelName,
-        });
-        await loadLibrarySearch();
-      }
-    } catch (err) {
-      toaster.toast({
-        title: t('toast.install.failed'),
-        body: String(err),
-        critical: true,
-      });
-    } finally {
-      setBusy(false);
-      await refresh();
     }
   };
 
@@ -654,126 +594,7 @@ function Content() {
         </PanelSectionRow>
       ) : null}
 
-      {status.service_active && (
-        <PanelSection title={t('library.title')}>
-          <PanelSectionRow>
-            <div style={{ color: "#8b8b8b", fontSize: "12px", marginBottom: "8px" }}>
-              {t('library.desc')}
-            </div>
-          </PanelSectionRow>
-          <PanelSectionRow>
-            <input
-              type="text"
-              value={librarySearch}
-              onChange={(e) => setLibrarySearch(e.target.value)}
-              placeholder={t('library.search.placeholder')}
-              style={{
-                width: "100%",
-                boxSizing: "border-box",
-                padding: "8px",
-                borderRadius: "4px",
-                border: "1px solid #4a4a4a",
-                background: "#1a1a1a",
-                color: "#fafafa",
-                fontSize: "14px",
-                marginBottom: "8px",
-              }}
-            />
-          </PanelSectionRow>
-          <PanelSectionRow>
-            <div style={{ display: "flex", gap: "4px", flexWrap: "wrap", marginBottom: "8px" }}>
-              {["all", "chat", "code", "embedding", "vision", "tools"].map((tag) => {
-                const isActive = tag === "all" ? libraryTags.length === 0 : libraryTags.includes(tag);
-                const tagKey = `library.tags.${tag}` as string;
-                return (
-                  <button
-                    key={tag}
-                    onClick={() => {
-                      if (tag === "all") {
-                        setLibraryTags([]);
-                      } else if (libraryTags.includes(tag)) {
-                        setLibraryTags(libraryTags.filter((t) => t !== tag));
-                      } else {
-                        setLibraryTags([...libraryTags, tag]);
-                      }
-                    }}
-                    style={{
-                      display: "inline-block",
-                      width: "auto",
-                      minWidth: 0,
-                      flex: "0 0 auto",
-                      flexShrink: 0,
-                      boxSizing: "border-box",
-                      padding: "4px 10px",
-                      borderRadius: "4px",
-                      border: isActive ? "1px solid #22c55e" : "1px solid #4a4a4a",
-                      background: isActive ? "#22c55e22" : "#1a1a1a",
-                      color: isActive ? "#22c55e" : "#e6e6e6",
-                      fontSize: "12px",
-                      cursor: "pointer",
-                      whiteSpace: "nowrap",
-                    }}
-                  >
-                    {t(tagKey)}
-                  </button>
-                );
-              })}
-            </div>
-          </PanelSectionRow>
-          {libraryLoading ? (
-            <PanelSectionRow>
-              <div style={{ color: "#8b8b8b", fontSize: "12px", textAlign: "center", padding: "16px" }}>
-                {t('library.loading')}
-              </div>
-            </PanelSectionRow>
-          ) : (
-            <>
-              {libraryResults.length > 0 ? (
-                libraryResults.map((m) => (
-                  <Fragment key={m.name}>
-                    <PanelSectionRow>
-                      <div style={{ marginBottom: "8px" }}>
-                        <div style={{ color: "#e6e6e6", fontWeight: 500 }}>{m.name}</div>
-                        <div style={{ color: "#8b8b8b", fontSize: "11px" }}>
-                          {m.description}
-                        </div>
-                        <div style={{ display: "flex", gap: "4px", marginTop: "4px" }}>
-                          {m.tags.map((t) => (
-                            <span key={t} style={{ fontSize: "10px", padding: "2px 6px", background: "#22c55e22", borderRadius: "3px", color: "#22c55e" }}>
-                              {t}
-                            </span>
-                          ))}
-                        </div>
-                      </div>
-                    </PanelSectionRow>
-                    <PanelSectionRow>
-                      <div style={{ marginBottom: "8px" }}>
-                        <FocusBtn
-                          onClick={() => doLibraryInstall(m.name)}
-                          disabled={busy}
-                        >
-                          {t('library.btn.install')}
-                        </FocusBtn>
-                      </div>
-                    </PanelSectionRow>
-                  </Fragment>
-                ))
-              ) : (
-                <PanelSectionRow>
-                  <div style={{ color: "#8b8b8b", fontSize: "12px", textAlign: "center", padding: "16px" }}>
-                    {t('library.empty')}
-                  </div>
-                </PanelSectionRow>
-              )}
-            </>
-          )}
-          <PanelSectionRow>
-            <div style={{ color: "#8b8b8b", fontSize: "11px", marginTop: "8px" }}>
-              {t('library.hint')}
-            </div>
-          </PanelSectionRow>
-        </PanelSection>
-      )}
+      
 
       {status.service_active && (
         <PanelSectionRow>
